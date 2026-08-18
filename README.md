@@ -21,6 +21,7 @@
 | API | Hono.js |
 | 実行・デプロイ | Cloudflare Workers |
 | データベース | Cloudflare D1（SQLite） |
+| 音声ストレージ・配信 | Cloudflare R2 + Custom Domain / Cache |
 | 認証 | Better Auth（Google OAuth のみ） |
 | 決済 | Stripe |
 
@@ -41,4 +42,3 @@
 ## ライセンス・データ表示
 
 アプリケーションコードのライセンスは未決定です。第三者データの利用条件はコードのライセンスとは別に適用されます。EJDict、Tatoeba、Kokoro の出典とライセンス表示を削除しないでください。詳細は [`docs/data-and-licenses.md`](./docs/data-and-licenses.md) を参照してください。
-
