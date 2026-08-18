@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Next.js / build output
+.next/
+out/
+build/
+dist/
+coverage/
+.turbo/
+
+# Cloudflare / Wrangler local state
+.wrangler/
+wrangler.local.toml
+
+# local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# logs and temporary files
+*.log
+*.tmp
+tmp/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# generated/imported data and audio artifacts
+data/raw/
+data/generated/
+audio/generated/
