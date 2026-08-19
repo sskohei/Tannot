@@ -1,13 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-
-type PreviewCard = {
-  term: string;
-  translation: string | null;
-  sentence: string | null;
-  existing: boolean;
-};
+import { LookupPreviewTable, type LookupPreviewItem } from "@/components/LookupPreviewTable";
 
 export function AddCardsForm({
   bookId,
@@ -23,7 +17,7 @@ export function AddCardsForm({
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState<PreviewCard[] | null>(null);
+  const [preview, setPreview] = useState<LookupPreviewItem[] | null>(null);
 
   async function previewCards(event: FormEvent) {
     event.preventDefault();
@@ -35,7 +29,7 @@ export function AddCardsForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input }),
       });
-      const data = await response.json() as { cards?: PreviewCard[]; error?: { message?: string } };
+      const data = await response.json() as { cards?: LookupPreviewItem[]; error?: { message?: string } };
       if (!response.ok) throw new Error(data.error?.message ?? "訳と例文を確認できませんでした");
       setPreview(data.cards ?? []);
     } catch (e) {
@@ -74,13 +68,7 @@ export function AddCardsForm({
       <label>英単語・熟語リスト<textarea required value={input} onChange={(event) => setInput(event.target.value)} placeholder={"review\nmake progress"} /></label>
     </> : <section className="preview-list" aria-live="polite">
       <div><h3>追加内容を確認</h3><p className="form-note">日本語訳と例文が正しければ、追加ボタンを押してください。</p></div>
-      {preview.map((card) => <article className="preview-card" key={card.term}>
-        <div className="preview-card-header"><h4>{card.term}</h4>{card.existing && <span className="badge">登録済み・スキップ</span>}</div>
-        <dl>
-          <div><dt>日本語訳</dt><dd>{card.translation ?? "見つかりませんでした"}</dd></div>
-          <div><dt>例文</dt><dd>{card.sentence ?? "見つかりませんでした"}</dd></div>
-        </dl>
-      </article>)}
+      <LookupPreviewTable items={preview} showStatus />
     </section>}
     {error && <p className="error">{error}</p>}
     <div className="actions"><button className="button" disabled={loading}>{loading ? (preview ? "追加中…" : "確認中…") : (preview ? "この内容で追加" : "訳・例文を確認")}</button>{preview && <button className="button secondary" type="button" onClick={() => { setPreview(null); setError(null); }} disabled={loading}>入力を修正</button>}<button className="button secondary" type="button" onClick={onCancel} disabled={loading}>キャンセル</button></div>

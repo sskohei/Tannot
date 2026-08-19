@@ -5,6 +5,7 @@
 | Method | Path | 内容 |
 | --- | --- | --- |
 | GET | `/api/me` | 現在のユーザーと利用枠 |
+| POST | `/api/books/preview` | 新しい単語帳の作成前に訳・例文を確認 |
 | POST | `/api/books` | 入力リストから単語帳を作成 |
 | GET | `/api/books` | 自分の単語帳一覧 |
 | GET | `/api/books/:bookId` | 自分の単語帳詳細 |
@@ -21,6 +22,8 @@
 `POST /api/study/reviews` の入力は `{ "cardId": "...", "rating": "again|hard|good|easy", "requestId": "..." }` です。`requestId` は再送時にも同じ値を使い、レビューの二重適用を防ぎます。
 
 `POST /api/books` の入力は `{ "title": "...", "input": "run\\ngive up" }` です。入力は最大100件、1項目100文字、全体10,000文字に制限します。空行・重複は正規化して除外します。
+
+`POST /api/books/preview` は同じ入力形式で、保存せずに日本語訳・例文を返します。確認後に `POST /api/books` を呼び出して単語帳を作成します。
 
 `POST /api/books/:bookId/cards` の入力は `{ "input": "review\\nmake progress" }` です。単語帳の所有者だけが利用でき、単語の制限は単語帳作成時と同じです。既存カードと同じ単語はスキップし、追加されたカードとスキップされた単語を返します。
 
