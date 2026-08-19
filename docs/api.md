@@ -13,9 +13,11 @@
 | POST | `/api/study/reviews` | 評価を保存し次回復習日を返す |
 | POST | `/api/billing/checkout` | Stripe Checkout セッション作成 |
 | POST | `/api/billing/webhook` | Stripe webhook（署名検証必須） |
-| GET | `/api/audio/:key` | R2に保存された音声を認証なしで配信 |
+| GET | `/api/audio/:cardId/:kind` | 所有権を確認し、Kokoroで生成した音声を直接中継（`kind` は `term` または `sentence`） |
 
-`GET /api/study/next` は `reveal=true` を指定したときだけ訳・例文を返します。通常の取得では英単語と音声参照だけを返し、解答前の情報をクライアントへ渡しません。
+`GET /api/study/next` は `reveal=true` を指定したときだけ訳・例文を返します。通常の取得では英単語とカードIDだけを返し、解答前の情報をクライアントへ渡しません。音声再生時はカードIDと種別を音声APIへ渡し、Workerがカードの所有権を確認してからKokoroへ中継します。
+
+`GET /api/audio/:cardId/:kind` は認証必須です。対象カードがログインユーザーの単語帳に属さない場合は `404` を返し、Kokoro推論サービスのエラーは内部情報を含めず `502` として返します。成功時はKokoroの音声バイナリを `audio/mpeg` で返し、音声ファイルやURLは保存しません。
 
 `POST /api/study/reviews` の入力は `{ "cardId": "...", "rating": "again|hard|good|easy", "requestId": "..." }` です。`requestId` は再送時にも同じ値を使い、レビューの二重適用を防ぎます。
 
