@@ -1,7 +1,7 @@
 import { HTTPException } from "hono/http-exception";
 import { ValidationError } from "@/lib/validation";
 
-export function jsonError(code: string, message: string, status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503): Response {
+export function jsonError(code: string, message: string, status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 502 | 503): Response {
   return Response.json({ error: { code, message } }, { status });
 }
 
