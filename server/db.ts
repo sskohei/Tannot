@@ -1,5 +1,11 @@
 import type { Card, DictionaryResult, StudyBook } from "@/lib/types";
 
+type CardInput = {
+  term: string;
+  normalizedTerm: string;
+  result: DictionaryResult;
+};
+
 type User = { id: string; email: string; name: string };
 
 export async function ensureUser(db: D1Database, user: User): Promise<void> {
@@ -21,11 +27,7 @@ export async function createBook(
   db: D1Database,
   userId: string,
   title: string,
-  cards: Array<{
-    term: string;
-    normalizedTerm: string;
-    result: DictionaryResult;
-  }>,
+  cards: CardInput[],
 ): Promise<StudyBook> {
   const bookId = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -58,6 +60,66 @@ export async function createBook(
   ];
   await db.batch(statements);
   return { id: bookId, user_id: userId, title, created_at: now, updated_at: now };
+}
+
+export async function addCards(
+  db: D1Database,
+  userId: string,
+  bookId: string,
+  cards: CardInput[],
+): Promise<{ book: StudyBook; addedCards: Card[]; skippedTerms: string[] } | null> {
+  const book = await db.prepare("SELECT * FROM study_books WHERE id = ? AND user_id = ?").bind(bookId, userId).first<StudyBook>();
+  if (!book) return null;
+
+  const existing = await db.prepare("SELECT normalized_term FROM cards WHERE book_id = ?").bind(bookId).all<{ normalized_term: string }>();
+  const existingTerms = new Set(existing.results.map((card) => card.normalized_term));
+  const newCards = cards.filter((card) => !existingTerms.has(card.normalizedTerm));
+  const skippedTerms = cards.filter((card) => existingTerms.has(card.normalizedTerm)).map((card) => card.term);
+  const now = new Date().toISOString();
+  const addedCards = newCards.map((card) => ({
+    id: crypto.randomUUID(),
+    book_id: bookId,
+    term: card.term,
+    normalized_term: card.normalizedTerm,
+    translation: card.result.translation,
+    sentence: card.result.sentence,
+    sentence_source_id: card.result.sourceId,
+    sentence_author: card.result.author,
+    sentence_source_url: card.result.sourceUrl,
+    error_code: !card.result.translation || !card.result.sentence ? "LOOKUP_INCOMPLETE" : null,
+    error_message: !card.result.translation || !card.result.sentence ? "辞書または例文が見つかりませんでした" : null,
+    created_at: now,
+  } satisfies Card));
+
+  if (addedCards.length > 0) {
+    await db.batch(addedCards.map((card) => db.prepare(
+      `INSERT INTO cards (
+        id, book_id, term, normalized_term, translation, sentence,
+        sentence_source_id, sentence_author, sentence_source_url,
+        error_code, error_message, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      card.id,
+      card.book_id,
+      card.term,
+      card.normalized_term,
+      card.translation,
+      card.sentence,
+      card.sentence_source_id,
+      card.sentence_author,
+      card.sentence_source_url,
+      card.error_code,
+      card.error_message,
+      card.created_at,
+    )));
+    await db.prepare("UPDATE study_books SET updated_at = ? WHERE id = ? AND user_id = ?").bind(now, bookId, userId).run();
+  }
+
+  return {
+    book: { ...book, updated_at: addedCards.length > 0 ? now : book.updated_at },
+    addedCards,
+    skippedTerms,
+  };
 }
 
 export async function listBooks(db: D1Database, userId: string): Promise<StudyBook[]> {
