@@ -8,7 +8,8 @@ export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  return <section className="panel stack">
+  return <section className="panel pop-shadow stack">
+    <p className="eyebrow">WELCOME BACK</p>
     <h1>ログイン</h1>
     <p className="muted">Googleアカウントでログインすると単語帳を保存できます。</p>
     {error && <p className="error">{error}</p>}

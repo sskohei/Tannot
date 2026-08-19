@@ -14,10 +14,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <header className="site-header">
           <Link href="/" className="brand">Tannot</Link>
-          <nav><Link href="/books">単語帳</Link><AuthButton /></nav>
+          <nav><Link className="nav-link" href="/books">単語帳</Link><AuthButton /></nav>
         </header>
         <main className="container">{children}</main>
-        <footer className="site-footer">EJDict（CC0）・Tatoeba（CC BY 2.0 FR）の出典情報を保持しています。</footer>
+        <footer className="site-footer"><div>Dictionary data from EJDict, licensed under CC0 1.0 Universal.</div><div>Example sentences from the <a href="https://tatoeba.org/" target="_blank" rel="noopener noreferrer">Tatoeba Project</a>, licensed under CC BY 2.0 FR.</div></footer>
       </body>
     </html>
   );
