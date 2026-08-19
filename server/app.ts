@@ -100,6 +100,27 @@ app.post("/api/books/:bookId/cards", async (c) => {
   return c.json({ book: added.book, cards: added.addedCards, skippedTerms: added.skippedTerms }, 201);
 });
 
+app.post("/api/books/:bookId/cards/preview", async (c) => {
+  const user = await requireUser(c);
+  const book = await getBook(c.env.DB, user.id, c.req.param("bookId"));
+  if (!book) return jsonError("NOT_FOUND", "単語帳が見つかりません", 404);
+
+  const body = await c.req.json<{ input?: unknown }>();
+  const terms = parseTerms(body.input);
+  const normalizedTerms = terms.map(normalizeTerm);
+  const results = await findLookupResults(c.env.ASSETS, c.req.url, normalizedTerms);
+  const existingTerms = new Set(book.cards.map((card) => card.normalized_term));
+
+  return c.json({
+    cards: terms.map((term, index) => ({
+      term,
+      translation: results[index].translation,
+      sentence: results[index].sentence,
+      existing: existingTerms.has(normalizedTerms[index]),
+    })),
+  });
+});
+
 app.get("/api/books/:bookId", async (c) => {
   const user = await requireUser(c);
   const book = await getBook(c.env.DB, user.id, c.req.param("bookId"));

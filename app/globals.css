@@ -76,6 +76,15 @@ textarea { min-height: 10rem; resize: vertical; }
 .badge { background: var(--mint); border-radius: 999px; color: var(--mint-ink); font-size: .7rem; font-weight: 900; padding: .4rem .7rem; white-space: nowrap; }
 .form-note, .muted { color: var(--muted); }
 .form-note { font-size: .8rem; line-height: 1.6; margin-bottom: 0; }
+.preview-list { display: grid; gap: .8rem; }
+.preview-list h3 { font-size: 1.1rem; margin-bottom: .3rem; }
+.preview-card { background: #fffdf7; border: 2px solid #f0dfc7; border-radius: 1rem; padding: .9rem 1rem; }
+.preview-card-header { align-items: center; display: flex; gap: .7rem; justify-content: space-between; }
+.preview-card h4 { font-size: 1.1rem; margin: 0; }
+.preview-card dl { display: grid; gap: .55rem; margin: .8rem 0 0; }
+.preview-card dl > div { display: grid; gap: .15rem; }
+.preview-card dt { color: var(--muted); font-size: .75rem; font-weight: 800; }
+.preview-card dd { line-height: 1.6; margin: 0; }
 .actions { display: flex; flex-wrap: wrap; gap: .7rem; }
 .error, .success { border: 2px solid; border-radius: 1rem; padding: .8rem 1rem; }
 .error { background: #fff0f0; border-color: #ffaaaa; color: #a33b3b; }
