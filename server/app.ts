@@ -6,12 +6,12 @@ import { calculateReview } from "@/lib/review";
 import { normalizeTerm, parseRating, parseRequestId, parseTerms, parseTitle } from "@/lib/validation";
 import type { Bindings } from "@/lib/types";
 import { createAuth } from "@/server/auth";
+import { findLookupResults } from "@/server/lookup-data";
 import {
   countUserBooks,
   createBook,
   deleteBook,
   ensureUser,
-  findDictionaryResult,
   findStudyCard,
   findSubscription,
   getBook,
@@ -64,13 +64,12 @@ app.post("/api/books", async (c) => {
     return jsonError("QUOTA_EXCEEDED", "無料利用枠を超えています", 429);
   }
 
-  const cards = await Promise.all(terms.map(async (term) => {
-    const normalizedTerm = normalizeTerm(term);
-    return {
-      term,
-      normalizedTerm,
-      result: await findDictionaryResult(c.env.DB, normalizedTerm),
-    };
+  const normalizedTerms = terms.map(normalizeTerm);
+  const results = await findLookupResults(c.env.ASSETS, c.req.url, normalizedTerms);
+  const cards = terms.map((term, index) => ({
+    term,
+    normalizedTerm: normalizedTerms[index],
+    result: results[index],
   }));
   const book = await createBook(c.env.DB, user.id, title, cards);
   return c.json({ book, cards: cards.map((card) => ({ term: card.term, ...card.result })) }, 201);

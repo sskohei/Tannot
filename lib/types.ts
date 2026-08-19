@@ -2,6 +2,7 @@ export type Rating = "again" | "hard" | "good" | "easy";
 
 export type Bindings = {
   DB: D1Database;
+  ASSETS?: Fetcher;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
   GOOGLE_CLIENT_ID: string;

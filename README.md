@@ -5,7 +5,7 @@
 ## 主な体験
 
 1. 利用者が英単語・熟語のリストを入力する。
-2. EJDict から日本語訳を取得し、Tatoeba から例文を取得する。
+2. Worker に同梱した EJDict / Tatoeba の検索用静的データから日本語訳・例文を取得する。
 3. ブラウザのWeb Speech APIで英単語または例文を読み上げる。
 4. 作成された単語帳を学習する。最初は英単語と英単語音声だけを表示する。
 5. 「解答」を押すと日本語訳・例文・例文音声を表示し、4段階評価で次回復習日を更新する。
@@ -20,7 +20,8 @@
 | フロントエンド | Next.js / TypeScript |
 | API | Hono.js |
 | 実行・デプロイ | Cloudflare Workers |
-| データベース | Cloudflare D1（SQLite） |
+| ユーザーデータベース | Cloudflare D1（SQLite） |
+| 辞書・例文データ | Worker 静的アセット（EJCSV 形式の検索用JSON） |
 | 音声生成・配信 | ブラウザ上で再生時に読み上げ（音声ファイルは保存しない） |
 | 認証 | Better Auth（Google OAuth のみ） |
 | 決済 | Stripe |
