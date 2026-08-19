@@ -17,7 +17,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <nav><Link href="/books">単語帳</Link><AuthButton /></nav>
         </header>
         <main className="container">{children}</main>
-        <footer className="site-footer">EJDict（CC0）・Tatoeba（CC BY 2.0 FR）・Kokoroの出典情報を保持しています。</footer>
+        <footer className="site-footer">EJDict（CC0）・Tatoeba（CC BY 2.0 FR）の出典情報を保持しています。</footer>
       </body>
     </html>
   );

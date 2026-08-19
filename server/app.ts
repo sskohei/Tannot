@@ -12,7 +12,6 @@ import {
   deleteBook,
   ensureUser,
   findDictionaryResult,
-  findAudioText,
   findStudyCard,
   findSubscription,
   getBook,
@@ -172,39 +171,5 @@ app.post("/api/billing/webhook", async (c) => {
   }
   return c.json({ received: true });
 });
-
-const audioHandler = async (c: AppContext) => {
-  const user = await requireUser(c);
-  const cardId = c.req.param("cardId");
-  const kind = c.req.param("kind");
-  if (!cardId || (kind !== "term" && kind !== "sentence")) return jsonError("NOT_FOUND", "音声が見つかりません", 404);
-  if (!c.env.AUDIO_GENERATOR_URL) return jsonError("AUDIO_NOT_CONFIGURED", "音声機能はまだ設定されていません", 503);
-
-  const text = await findAudioText(c.env.DB, user.id, cardId, kind);
-  if (!text) return jsonError("NOT_FOUND", "音声が見つかりません", 404);
-
-  try {
-    const response = await fetch(c.env.AUDIO_GENERATOR_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, voice: "en", modelVersion: "v1" }),
-    });
-    if (!response.ok) {
-      console.error("audio_generator_failed", response.status);
-      return jsonError("AUDIO_GENERATION_FAILED", "音声を生成できませんでした", 502);
-    }
-    return new Response(response.body, {
-      headers: {
-        "Content-Type": response.headers.get("Content-Type")?.startsWith("audio/") ? response.headers.get("Content-Type")! : "audio/mpeg",
-        "Cache-Control": "private, no-store",
-      },
-    });
-  } catch (error) {
-    console.error("audio_generator_unreachable", error instanceof Error ? error.message : "unknown error");
-    return jsonError("AUDIO_GENERATION_FAILED", "音声を生成できませんでした", 502);
-  }
-};
-
-app.get("/api/audio/:cardId/:kind", audioHandler);
 
 app.get("/health", (c) => c.json({ ok: true }));

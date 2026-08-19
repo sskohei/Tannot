@@ -9,7 +9,6 @@ export type Bindings = {
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_ID?: string;
-  AUDIO_GENERATOR_URL?: string;
   FREE_BOOK_LIMIT?: string;
 };
 
