@@ -141,20 +141,34 @@ export async function deleteBook(db: D1Database, userId: string, bookId: string)
 }
 
 export async function findStudyCard(db: D1Database, userId: string, bookId: string, reveal: boolean): Promise<Record<string, unknown> | null> {
-  const row = await db
-    .prepare(
-      `SELECT c.*, latest.rating, latest.due_at, latest.interval_days, latest.ease_factor, latest.repetitions
-       FROM cards c
-       JOIN study_books b ON b.id = c.book_id AND b.user_id = ?
-       LEFT JOIN reviews latest ON latest.id = (
-         SELECT r.id FROM reviews r WHERE r.card_id = c.id ORDER BY r.reviewed_at DESC LIMIT 1
-       )
+  const select = `SELECT c.*, latest.rating, latest.due_at, latest.interval_days, latest.ease_factor, latest.repetitions
+    FROM cards c
+    JOIN study_books b ON b.id = c.book_id AND b.user_id = ?
+    LEFT JOIN reviews latest ON latest.id = (
+      SELECT r.id FROM reviews r WHERE r.card_id = c.id ORDER BY r.reviewed_at DESC LIMIT 1
+    )`;
+  const queryNow = new Date().toISOString();
+  let row = await db
+    .prepare(`${select}
        WHERE c.book_id = ? AND (latest.id IS NULL OR latest.due_at <= ?)
        ORDER BY CASE WHEN latest.id IS NULL THEN 0 ELSE 1 END, COALESCE(latest.due_at, c.created_at), c.created_at
-       LIMIT 1`,
-    )
-    .bind(userId, bookId, new Date().toISOString())
+       LIMIT 1`)
+    .bind(userId, bookId, queryNow)
     .first<Record<string, unknown>>();
+
+  if (!row) {
+    const remaining = await db
+      .prepare(`${select}
+         WHERE c.book_id = ? AND latest.id IS NOT NULL
+         ORDER BY latest.due_at, c.created_at`)
+      .bind(userId, bookId)
+      .all<Record<string, unknown>>();
+    // If every remaining card is a minute-based retry, let the user continue
+    // without waiting for the retry timer. Day-based reviews still wait.
+    if (remaining.results.length > 0 && remaining.results.every((card) => Number(card.interval_days) === 0)) {
+      row = remaining.results[0];
+    }
+  }
   if (!row) return null;
   if (!reveal) {
     return {

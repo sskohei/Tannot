@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addCards } from "@/server/db";
+import { addCards, findStudyCard } from "@/server/db";
 
 const book = {
   id: "book-1",
@@ -49,4 +49,35 @@ describe("study book cards", () => {
     await expect(addCards(db, "user-2", "book-1", [])).resolves.toBeNull();
     expect(statements).toHaveLength(0);
   });
+
+  it("shows a minute-based retry before its timer expires when all remaining cards are retries", async () => {
+    const db = createStudyDb([
+      { id: "card-1", book_id: "book-1", term: "retry", interval_days: 0, due_at: "2099-01-01T00:10:00.000Z" },
+    ]);
+
+    await expect(findStudyCard(db, "user-1", "book-1", false)).resolves.toMatchObject({ id: "card-1", term: "retry" });
+  });
+
+  it("does not skip a day-based review wait", async () => {
+    const db = createStudyDb([
+      { id: "card-1", book_id: "book-1", term: "later", interval_days: 1, due_at: "2099-01-01T00:00:00.000Z" },
+    ]);
+
+    await expect(findStudyCard(db, "user-1", "book-1", false)).resolves.toBeNull();
+  });
 });
+
+function createStudyDb(remaining: Record<string, unknown>[]) {
+  return {
+    prepare(sql: string) {
+      return {
+        bind(..._values: unknown[]) {
+          return {
+            first: async <T>() => null as T | null,
+            all: async <T>() => sql.includes("latest.id IS NOT NULL") ? { results: remaining as T[] } : { results: [] as T[] },
+          };
+        },
+      };
+    },
+  } as unknown as D1Database;
+}
