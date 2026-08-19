@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tannot",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tannot-db",
+      "database_id": "local",
+      "migrations_dir": "db/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AUDIO",
+      "bucket_name": "tannot-audio"
+    }
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "AUDIO_BASE_URL": "http://localhost:8787/audio",
+    "FREE_BOOK_LIMIT": "3"
+  }
+}

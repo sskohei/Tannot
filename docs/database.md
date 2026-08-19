@@ -4,7 +4,8 @@ Cloudflare D1 は SQLite のため、スキーマ変更は `wrangler d1 migratio
 
 | テーブル | 主なカラム | 目的 |
 | --- | --- | --- |
-| users | id, email, name, created_at | Better Auth のユーザー |
+| user / account / session / verification | Better Auth標準カラム | Google OAuthとセッション |
+| users | id, email, name, created_at | アプリケーション側のユーザー参照 |
 | study_books | id, user_id, title, created_at, updated_at | 単語帳 |
 | cards | id, book_id, term, normalized_term, translation, sentence, sentence_source_id, term_audio_key, sentence_audio_key, term_audio_status, sentence_audio_status | 単語カード、出典、R2音声参照 |
 | reviews | id, card_id, user_id, rating, reviewed_at, due_at, interval_days, ease_factor, repetitions | 学習状態 |
@@ -25,7 +26,7 @@ audio/en/v1/{sha256-of-text-and-settings}.mp3
 
 ## 認可
 
-すべての単語帳・カード・レビュー操作は、ログイン中のユーザー ID をサーバーセッションから取得し、`user_id` を条件にした SQL で実行します。`book_id` や `card_id` 単独で取得してから認可する実装は避けます。D1 に PostgreSQL の RLS はないため、Hono のリポジトリ層・サービス層で同等の所有権チェックを徹底します。
+すべての単語帳・カード・レビュー操作は、ログイン中のユーザー ID をサーバーセッションから取得し、`user_id` を条件にした SQL で実行します。`book_id` や `card_id` 単独で取得してから認可する実装は避けます。D1 に PostgreSQL の RLS はないため、Hono のリポジトリ層・サービス層で同等の所有権チェックを徹底します。Better Authの `user` と、アプリケーションの `users` は同じIDを共有します。
 
 ## 整合性
 

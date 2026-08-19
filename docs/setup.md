@@ -2,14 +2,14 @@
 
 ## ローカル開発
 
-1. Node.js のプロジェクト推奨バージョンを確認する。
-2. 依存関係をインストールする。
+1. Node.js 22 以上を用意する。
+2. `npm ci` で依存関係をインストールする。
 3. `.env.example` を `.env.local` にコピーし、Google OAuth、Better Auth、Stripe の値を設定する。
-4. Wrangler にR2バケットを作成し、ローカル開発用のR2 Bindingを設定する。
-5. Wrangler の D1 ローカルデータベースへマイグレーションを適用する。
-6. 開発サーバーを起動する。
+4. `npx wrangler d1 migrations apply tannot-db --local` でローカルD1へマイグレーションを適用する。
+5. `npx wrangler d1 execute tannot-db --local --file=db/seed.sql` で開発用データを投入する。
+6. `npm run dev` でNext.jsを起動する。Cloudflare Worker相当の環境で確認する場合は `npm run preview` を使う。
 
-具体的なコマンドはアプリ実装時に `package.json` と `.env.example` に追加し、この文書と一致させます。秘密情報はコミットしません。
+秘密情報はコミットしません。Cloudflare Workersへデプロイする場合は `npm run deploy` を使い、D1・R2 bindingとsecretをWorkerへ設定します。
 
 ## 本番環境
 
@@ -24,4 +24,13 @@
 
 ## 必須情報の例
 
-`BETTER_AUTH_SECRET`、Google OAuth の client ID/secret、`STRIPE_SECRET_KEY`、`STRIPE_WEBHOOK_SECRET`、D1 binding 名、R2 bucket binding 名、R2 Custom Domain。実際の変数名は実装の設定ファイルを正とします。
+`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`STRIPE_SECRET_KEY`、`STRIPE_WEBHOOK_SECRET`、`STRIPE_PRICE_ID`、D1 binding 名、R2 bucket binding 名、R2 Custom Domain。実際の変数名は `.env.example` と `wrangler.jsonc` を正とします。
+
+## Google OAuth redirect URI
+
+- ローカル: `http://localhost:3000/api/auth/callback/google`
+- 本番: `https://<本番ドメイン>/api/auth/callback/google`
+
+## データ取り込み
+
+EJDictのインポート用JSONは `[{"term":"run","translation":"走る"}]` の形式にし、`npx tsx scripts/import-dictionary.ts entries.json > dictionary.sql` でSQLを生成します。Tatoebaの例文は出典ID・作者・URLを含めて `example_sentences` へ投入してください。取得日と版を記録し、ライセンスを確認していないデータは投入しません。
