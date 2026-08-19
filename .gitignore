@@ -5,6 +5,7 @@ node_modules/
 
 # Next.js / build output
 .next/
+.open-next/
 out/
 build/
 dist/
@@ -14,6 +15,7 @@ coverage/
 # Cloudflare / Wrangler local state
 .wrangler/
 wrangler.local.toml
+worker-configuration.d.ts
 
 # local environment and secrets
 .env
@@ -33,9 +35,11 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
-!.vscode/settings.json
 
 # generated/imported data and audio artifacts
 data/raw/
 data/generated/
 audio/generated/
+
+# TypeScript build metadata
+*.tsbuildinfo
