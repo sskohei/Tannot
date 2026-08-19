@@ -53,6 +53,30 @@ app.get("/api/me", async (c) => {
   return c.json({ user, usage: { books: bookCount, freeBookLimit: limit }, subscription });
 });
 
+app.post("/api/books/preview", async (c) => {
+  const user = await requireUser(c);
+  const body = await c.req.json<{ title?: unknown; input?: unknown }>();
+  const title = parseTitle(body.title);
+  const terms = parseTerms(body.input);
+  const freeLimit = Number(c.env.FREE_BOOK_LIMIT ?? 3);
+  const subscription = await findSubscription(c.env.DB, user.id);
+  const isPaid = subscription?.status === "active" || subscription?.status === "trialing";
+  if (!isPaid && (await countUserBooks(c.env.DB, user.id)) >= freeLimit) {
+    return jsonError("QUOTA_EXCEEDED", "無料利用枠を超えています", 429);
+  }
+
+  const normalizedTerms = terms.map(normalizeTerm);
+  const results = await findLookupResults(c.env.ASSETS, c.req.url, normalizedTerms);
+  return c.json({
+    title,
+    cards: terms.map((term, index) => ({
+      term,
+      translation: results[index].translation,
+      sentence: results[index].sentence,
+    })),
+  });
+});
+
 app.post("/api/books", async (c) => {
   const user = await requireUser(c);
   const body = await c.req.json<{ title?: unknown; input?: unknown }>();
@@ -98,6 +122,27 @@ app.post("/api/books/:bookId/cards", async (c) => {
   })));
   if (!added) return jsonError("NOT_FOUND", "単語帳が見つかりません", 404);
   return c.json({ book: added.book, cards: added.addedCards, skippedTerms: added.skippedTerms }, 201);
+});
+
+app.post("/api/books/:bookId/cards/preview", async (c) => {
+  const user = await requireUser(c);
+  const book = await getBook(c.env.DB, user.id, c.req.param("bookId"));
+  if (!book) return jsonError("NOT_FOUND", "単語帳が見つかりません", 404);
+
+  const body = await c.req.json<{ input?: unknown }>();
+  const terms = parseTerms(body.input);
+  const normalizedTerms = terms.map(normalizeTerm);
+  const results = await findLookupResults(c.env.ASSETS, c.req.url, normalizedTerms);
+  const existingTerms = new Set(book.cards.map((card) => card.normalized_term));
+
+  return c.json({
+    cards: terms.map((term, index) => ({
+      term,
+      translation: results[index].translation,
+      sentence: results[index].sentence,
+      existing: existingTerms.has(normalizedTerms[index]),
+    })),
+  });
 });
 
 app.get("/api/books/:bookId", async (c) => {
