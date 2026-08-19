@@ -97,6 +97,7 @@ textarea { min-height: 10rem; resize: vertical; }
 .speech-actions { display: flex; flex-wrap: wrap; gap: .8rem; justify-content: center; }
 .rating-grid { display: grid; gap: .7rem; grid-template-columns: repeat(4, 1fr); margin-top: 1.4rem; }
 .rating-grid .button { padding-inline: .6rem; }
+.rating-grid .button small { display: block; font-size: .72rem; font-weight: 700; margin-top: .2rem; }
 .card-list { display: grid; gap: .9rem; }
 .card-list .panel { border-radius: 1.25rem; padding: 1.1rem 1.25rem; }
 .card-list h2 { font-size: 1.45rem; margin-bottom: .45rem; }

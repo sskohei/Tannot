@@ -1,4 +1,5 @@
 import type { Card, DictionaryResult, StudyBook } from "@/lib/types";
+import { getReviewIntervals } from "@/lib/review";
 
 type CardInput = {
   term: string;
@@ -162,6 +163,12 @@ export async function findStudyCard(db: D1Database, userId: string, bookId: stri
       term: row.term,
     };
   }
+  const now = new Date();
+  const reviewIntervals = getReviewIntervals({
+    intervalDays: Number(row.interval_days ?? 0),
+    easeFactor: Number(row.ease_factor ?? 2.5),
+    repetitions: Number(row.repetitions ?? 0),
+  }, now);
   return {
     id: row.id,
     bookId: row.book_id,
@@ -171,6 +178,7 @@ export async function findStudyCard(db: D1Database, userId: string, bookId: stri
     sentenceSourceId: row.sentence_source_id,
     sentenceAuthor: row.sentence_author,
     sentenceSourceUrl: row.sentence_source_url,
+    reviewIntervals,
   };
 }
 

@@ -2,6 +2,12 @@ import type { Rating, ReviewState } from "./types";
 
 const MIN_EASE = 1.3;
 const MAX_INTERVAL_DAYS = 365;
+const ratings = ["again", "hard", "good", "easy"] as const;
+
+export type ReviewInterval = {
+  intervalDays: number;
+  intervalMinutes: number | null;
+};
 
 export function calculateReview(
   rating: Rating,
@@ -44,4 +50,17 @@ export function calculateReview(
   else dueAt.setUTCDate(dueAt.getUTCDate() + intervalDays);
 
   return { rating, intervalDays, easeFactor, repetitions, dueAt };
+}
+
+export function getReviewIntervals(
+  previous: Pick<ReviewState, "intervalDays" | "easeFactor" | "repetitions">,
+  now = new Date(),
+): Record<Rating, ReviewInterval> {
+  return Object.fromEntries(ratings.map((rating) => {
+    const state = calculateReview(rating, previous, now);
+    return [rating, {
+      intervalDays: state.intervalDays,
+      intervalMinutes: state.intervalDays === 0 ? Math.round((state.dueAt.getTime() - now.getTime()) / 60_000) : null,
+    }];
+  })) as Record<Rating, ReviewInterval>;
 }
