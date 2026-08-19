@@ -24,7 +24,7 @@ npx wrangler d1 info tannot-staging --env staging
 npx wrangler d1 migrations apply tannot-staging --remote --env staging
 ```
 
-本番には `db/seed.sql` をそのまま投入しません。開発用seedには検証用の例文が含まれるため、本番データはライセンス確認済みのインポート手順を使います。
+本番には `db/seed.sql` をそのまま投入しません。辞書・例文はD1へ投入せず、ライセンス確認済みの静的検索アセットをWorkerへデプロイします。
 
 ## 音声読み上げ
 

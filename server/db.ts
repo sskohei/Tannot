@@ -17,28 +17,6 @@ export async function countUserBooks(db: D1Database, userId: string): Promise<nu
   return Number(result?.count ?? 0);
 }
 
-export async function findDictionaryResult(db: D1Database, normalizedTerm: string): Promise<DictionaryResult> {
-  const dictionary = await db
-    .prepare("SELECT translation FROM dictionary_entries WHERE normalized_term = ?")
-    .bind(normalizedTerm)
-    .first<{ translation: string }>();
-  const example = await db
-    .prepare(
-      `SELECT sentence, source_id, author, source_url
-       FROM example_sentences WHERE normalized_term = ? ORDER BY id LIMIT 1`,
-    )
-    .bind(normalizedTerm)
-    .first<{ sentence: string; source_id: string; author: string | null; source_url: string | null }>();
-
-  return {
-    translation: dictionary?.translation ?? null,
-    sentence: example?.sentence ?? null,
-    sourceId: example?.source_id ?? null,
-    author: example?.author ?? null,
-    sourceUrl: example?.source_url ?? null,
-  };
-}
-
 export async function createBook(
   db: D1Database,
   userId: string,

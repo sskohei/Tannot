@@ -33,4 +33,6 @@
 
 ## データ取り込み
 
-EJDictのインポート用JSONは `[{"term":"run","translation":"走る"}]` の形式にし、`npx tsx scripts/import-dictionary.ts entries.json > dictionary.sql` でSQLを生成します。Tatoebaの例文は出典ID・作者・URLを含めて `example_sentences` へ投入してください。取得日と版を記録し、ライセンスを確認していないデータは投入しません。
+EJCSV のビルド済み SQLite (`ejcsv.db`) を取得した場合は、`npx tsx scripts/build-lookup-assets.ts path/to/ejcsv.db public/data/lookup <EJCSVのコミットまたは版>` で Worker 用の検索アセットを生成できます。生成物を確認してからデプロイしてください。辞書・例文データの D1 migration や D1 への投入は行いません。
+
+検索データを更新する場合は、EJCSV のデータビルド版を更新してから同じコマンドで静的アセットを再生成します。生成された `manifest.json` の版と、ライセンス・取得日を `docs/data-and-licenses.md` に記録します。

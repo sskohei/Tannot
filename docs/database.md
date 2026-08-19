@@ -1,16 +1,24 @@
 # データベース設計
 
-Cloudflare D1 は SQLite のため、スキーマ変更は `wrangler d1 migrations` で管理します。以下は MVP の論理モデルです。
+Cloudflare D1 は SQLite のため、スキーマ変更は `wrangler d1 migrations` で管理します。D1 はユーザー固有データ専用とし、辞書・例文は EJCSV と同じくオフラインで作成した読み取り専用データとして Worker の静的アセットに配布します。
 
 | テーブル | 主なカラム | 目的 |
 | --- | --- | --- |
 | user / account / session / verification | Better Auth標準カラム | Google OAuthとセッション |
 | users | id, email, name, created_at | アプリケーション側のユーザー参照 |
 | study_books | id, user_id, title, created_at, updated_at | 単語帳 |
-| cards | id, book_id, term, normalized_term, translation, sentence, sentence_source_id | 単語カードと出典。音声は保存しない |
+| cards | id, book_id, term, normalized_term, translation, sentence, sentence_source_id | 単語カードのスナップショットと出典。音声は保存しない |
 | reviews | id, card_id, user_id, rating, reviewed_at, due_at, interval_days, ease_factor, repetitions | 学習状態 |
 | subscriptions | user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end | 課金状態 |
 | stripe_events | event_id, received_at | webhook の冪等性 |
+
+## 辞書・例文データ
+
+EJDict と Tatoeba の生データをリクエスト時に読み込まず、EJCSV のビルド済み SQLite (`ejcsv.db`) を `scripts/build-lookup-assets.ts` で単語の先頭文字ごとの JSON に変換します。生成物は `public/data/lookup/` に置かれ、Worker の静的アセットとして配信されます。D1 には辞書・例文を保存しません。
+
+例文は EJCSV と同じく、オフラインビルド時に単語境界で一致する候補から1文へ絞り込みます。カード作成時に静的アセットを検索し、訳・例文・Tatoebaの出典URLをカードへスナップショット保存します。
+
+旧MVPの `dictionary_entries` と `example_sentences` は migration `0004_remove_legacy_lookup_tables.sql` で削除します。カードのスナップショットは削除せず、既存の単語帳を維持します。
 
 ## 音声データ
 
