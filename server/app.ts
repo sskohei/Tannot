@@ -8,6 +8,7 @@ import type { Bindings } from "@/lib/types";
 import { createAuth } from "@/server/auth";
 import { findLookupResults } from "@/server/lookup-data";
 import {
+  addCards,
   countUserBooks,
   createBook,
   deleteBook,
@@ -78,6 +79,25 @@ app.post("/api/books", async (c) => {
 app.get("/api/books", async (c) => {
   const user = await requireUser(c);
   return c.json({ books: await listBooks(c.env.DB, user.id) });
+});
+
+app.post("/api/books/:bookId/cards", async (c) => {
+  const user = await requireUser(c);
+  const bookId = c.req.param("bookId");
+  const book = await getBook(c.env.DB, user.id, bookId);
+  if (!book) return jsonError("NOT_FOUND", "単語帳が見つかりません", 404);
+
+  const body = await c.req.json<{ input?: unknown }>();
+  const terms = parseTerms(body.input);
+  const normalizedTerms = terms.map(normalizeTerm);
+  const results = await findLookupResults(c.env.ASSETS, c.req.url, normalizedTerms);
+  const added = await addCards(c.env.DB, user.id, bookId, terms.map((term, index) => ({
+    term,
+    normalizedTerm: normalizedTerms[index],
+    result: results[index],
+  })));
+  if (!added) return jsonError("NOT_FOUND", "単語帳が見つかりません", 404);
+  return c.json({ book: added.book, cards: added.addedCards, skippedTerms: added.skippedTerms }, 201);
 });
 
 app.get("/api/books/:bookId", async (c) => {

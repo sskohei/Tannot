@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function BookForm() {
+export function BookForm({ onCreated }: { onCreated?: () => void }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [input, setInput] = useState("");
@@ -16,7 +16,8 @@ export function BookForm() {
       const data = await response.json() as { error?: { message?: string }; book?: { id: string } };
       if (!response.ok) throw new Error(data.error?.message ?? "単語帳を作成できませんでした");
       if (!data.book) throw new Error("作成結果を取得できませんでした");
-      router.push(`/books/${data.book.id}`);
+      if (onCreated) onCreated();
+      else router.push(`/books/${data.book.id}`);
     } catch (e) { setError(e instanceof Error ? e.message : "単語帳を作成できませんでした"); setLoading(false); }
   }
   return <form className="panel pop-shadow stack" onSubmit={submit}>
