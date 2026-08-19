@@ -38,6 +38,7 @@
 - [`docs/learning.md`](./docs/learning.md): 間隔反復とカード状態
 - [`docs/data-and-licenses.md`](./docs/data-and-licenses.md): データ出典・帰属・配布時の注意
 - [`docs/setup.md`](./docs/setup.md): 開発・デプロイ・秘密情報の管理
+- [`docs/production.md`](./docs/production.md): 本番Cloudflareリソースとデプロイ前チェック
 
 ## ライセンス・データ表示
 

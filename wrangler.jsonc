@@ -8,7 +8,7 @@
     {
       "binding": "DB",
       "database_name": "tannot-db",
-      "database_id": "local",
+      "database_id": "97d7b5bd-3c01-468c-ac2d-dfa5cb342c22",
       "migrations_dir": "db/migrations"
     }
   ],
@@ -23,7 +23,6 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "AUDIO_BASE_URL": "http://localhost:8787/audio",
     "FREE_BOOK_LIMIT": "3"
   }
 }
