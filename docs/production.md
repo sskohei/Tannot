@@ -26,11 +26,9 @@ npx wrangler d1 migrations apply tannot-staging --remote --env staging
 
 本番には `db/seed.sql` をそのまま投入しません。開発用seedには検証用の例文が含まれるため、本番データはライセンス確認済みのインポート手順を使います。
 
-## 音声推論サービス
+## 音声読み上げ
 
-音声ファイルはR2などへ保存せず、再生時にWorkerからKokoro推論サービスへリクエストします。本番とステージングで推論サービスのURL・認証情報を分離し、`AUDIO_GENERATOR_URL` と認証secretはWorker secretまたは環境変数として設定します。
-
-Kokoro-82Mの推論はWorkers内で実行せず、CPUまたはGPUを備えた外部サービスで実行します。Workerはカードの所有権を確認した上で音声レスポンスを中継し、音声ファイルやURLを保存しません。
+音声ファイルはR2などへ保存せず、学習画面でブラウザのWeb Speech APIを使って読み上げます。音声合成は端末・OS・ブラウザが提供するため、本番・ステージングWorkerへ音声サービスのURLや認証secretを設定する必要はありません。
 
 ## デプロイ前チェック
 
@@ -42,6 +40,6 @@ npm test
 npm run build
 ```
 
-ステージングWorkerのデプロイは `npm run deploy -- --env staging` で実行します。デプロイ前に、ステージング用のCloudflare secret、Kokoro推論エンドポイント、OAuth/Stripe endpointを登録し、本番のsecret・データベース・推論サービス設定を共有していないことを確認します。
+ステージングWorkerのデプロイは `npm run deploy -- --env staging` で実行します。デプロイ前に、ステージング用のCloudflare secret、OAuth/Stripe endpointを登録し、本番のsecret・データベース設定を共有していないことを確認します。
 
-`CLOUDFLARE_API_TOKEN` がない場合、Wranglerのremote確認・migrationは実行できません。tokenとKokoro接続secretはリポジトリへ保存せず、CloudflareまたはCIのsecretとして設定します。
+`CLOUDFLARE_API_TOKEN` がない場合、Wranglerのremote確認・migrationは実行できません。tokenはリポジトリへ保存せず、CloudflareまたはCIのsecretとして設定します。

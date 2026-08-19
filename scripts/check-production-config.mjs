@@ -23,7 +23,7 @@ if (stagingDatabase?.database_name !== "tannot-staging") {
   errors.push("staging DB binding must use the staging database name");
 }
 if (config.r2_buckets || staging?.r2_buckets) {
-  errors.push("R2 audio bindings must not be configured; audio is generated on demand by Kokoro");
+  errors.push("R2 bindings are not required by the current application");
 }
 if (JSON.stringify(config).includes("localhost")) {
   errors.push("Production Wrangler configuration must not contain localhost URLs");
@@ -34,4 +34,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`Production config OK: D1 ${database.database_id}; staging D1 ${stagingDatabase.database_id}; audio is generated on demand by Kokoro`);
+console.log(`Production config OK: D1 ${database.database_id}; staging D1 ${stagingDatabase.database_id}; audio uses the browser Web Speech API`);

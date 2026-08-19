@@ -134,22 +134,6 @@ export async function findStudyCard(db: D1Database, userId: string, bookId: stri
   };
 }
 
-export type AudioKind = "term" | "sentence";
-
-export async function findAudioText(db: D1Database, userId: string, cardId: string, kind: AudioKind): Promise<string | null> {
-  const column = kind === "term" ? "c.term" : "c.sentence";
-  const row = await db
-    .prepare(
-      `SELECT ${column} AS text
-       FROM cards c
-       JOIN study_books b ON b.id = c.book_id AND b.user_id = ?
-       WHERE c.id = ?`,
-    )
-    .bind(userId, cardId)
-    .first<{ text: string | null }>();
-  return row?.text ?? null;
-}
-
 export async function saveReview(
   db: D1Database,
   userId: string,
