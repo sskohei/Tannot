@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-type Card = { id: string; term: string; translation?: string | null; sentence?: string | null; termAudioKey?: string | null; sentenceAudioKey?: string | null; termAudioStatus?: string; sentenceAudioStatus?: string; sentenceSourceId?: string | null; sentenceAuthor?: string | null; sentenceSourceUrl?: string | null };
+type Card = { id: string; term: string; translation?: string | null; sentence?: string | null; sentenceSourceId?: string | null; sentenceAuthor?: string | null; sentenceSourceUrl?: string | null };
 const labels = { again: "もう一度", hard: "難しい", good: "普通", easy: "簡単" } as const;
 export function StudyClient({ bookId }: { bookId: string }) {
   const [card, setCard] = useState<Card | null>(null); const [answer, setAnswer] = useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
@@ -12,5 +12,5 @@ export function StudyClient({ bookId }: { bookId: string }) {
   if (error) return <section className="study-card"><p className="error">{error}</p><button className="button" onClick={() => void load()}>再試行</button></section>;
   if (loading && !card) return <p className="muted">学習カードを読み込み中…</p>;
   if (!card) return <section className="study-card"><h2>今日は完了です</h2><p className="muted">復習対象のカードはありません。</p></section>;
-  return <section className="study-card"><p className="muted">{answer ? "解答" : "問題"}</p><h2>{card.term}</h2>{!answer ? <><button className="button" disabled={loading} onClick={() => void load(true)}>解答を見る</button>{card.termAudioStatus === "ready" && card.termAudioKey && <audio controls src={`/api/audio/${card.termAudioKey}`} />}</> : <><p>{card.translation ?? "訳が登録されていません"}</p><p>{card.sentence ?? "例文が登録されていません"}</p>{card.sentenceAudioStatus === "ready" && card.sentenceAudioKey && <audio controls src={`/api/audio/${card.sentenceAudioKey}`} />}<div className="rating-grid">{Object.entries(labels).map(([key, label]) => <button className="button secondary" disabled={loading} key={key} onClick={() => void rate(key as keyof typeof labels)}>{label}</button>)}</div></>}</section>;
+  return <section className="study-card"><p className="muted">{answer ? "解答" : "問題"}</p><h2>{card.term}</h2>{!answer ? <><button className="button" disabled={loading} onClick={() => void load(true)}>解答を見る</button><audio controls preload="none" src={`/api/audio/${card.id}/term`} /></> : <><p>{card.translation ?? "訳が登録されていません"}</p><p>{card.sentence ?? "例文が登録されていません"}</p>{card.sentence && <audio controls preload="none" src={`/api/audio/${card.id}/sentence`} />}<div className="rating-grid">{Object.entries(labels).map(([key, label]) => <button className="button secondary" disabled={loading} key={key} onClick={() => void rate(key as keyof typeof labels)}>{label}</button>)}</div></>}</section>;
 }

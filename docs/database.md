@@ -7,22 +7,16 @@ Cloudflare D1 は SQLite のため、スキーマ変更は `wrangler d1 migratio
 | user / account / session / verification | Better Auth標準カラム | Google OAuthとセッション |
 | users | id, email, name, created_at | アプリケーション側のユーザー参照 |
 | study_books | id, user_id, title, created_at, updated_at | 単語帳 |
-| cards | id, book_id, term, normalized_term, translation, sentence, sentence_source_id, term_audio_key, sentence_audio_key, term_audio_status, sentence_audio_status | 単語カード、出典、R2音声参照 |
+| cards | id, book_id, term, normalized_term, translation, sentence, sentence_source_id | 単語カードと出典。音声は保存しない |
 | reviews | id, card_id, user_id, rating, reviewed_at, due_at, interval_days, ease_factor, repetitions | 学習状態 |
 | subscriptions | user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end | 課金状態 |
 | stripe_events | event_id, received_at | webhook の冪等性 |
 
-## R2 音声メタデータ
+## 音声データ
 
-音声ファイル本体はR2に保存し、`cards` にはURLではなくR2のobject keyを保存します。object keyの例は次の通りです。
+音声はカードの`term`または`sentence`を入力として、再生時にKokoro推論サービスで生成します。音声ファイル本体、object key、固定URL、生成状態はD1に保存しません。
 
-```text
-audio/en/v1/{sha256-of-text-and-settings}.mp3
-```
-
-`term_audio_key` と `sentence_audio_key` は共有アセットを参照できるため、ユーザーごとに同じ音声を複製しません。`term_audio_status` と `sentence_audio_status` は、少なくとも `pending`、`ready`、`failed` を扱います。音声生成が失敗しても、テキストカードと学習機能は利用可能にします。
-
-音声を再生成したときに古い音声と混同しないよう、object key にモデルバージョンまたは音声設定のバージョンを含めます。R2のURLは環境ごとに変わり得るため、D1に固定URLを保存せず、配信時に設定から組み立てます。
+既存の音声key・statusカラムは、オンデマンド音声APIへ移行するD1マイグレーションで削除する。音声生成が失敗しても、テキストカードと学習機能は利用可能にする。
 
 ## 認可
 

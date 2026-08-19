@@ -47,7 +47,6 @@ export async function createBook(
     term: string;
     normalizedTerm: string;
     result: DictionaryResult;
-    audioStatus: "pending" | "failed";
   }>,
 ): Promise<StudyBook> {
   const bookId = crypto.randomUUID();
@@ -61,8 +60,8 @@ export async function createBook(
           `INSERT INTO cards (
             id, book_id, term, normalized_term, translation, sentence,
             sentence_source_id, sentence_author, sentence_source_url,
-            term_audio_status, sentence_audio_status, error_code, error_message
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            error_code, error_message
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           crypto.randomUUID(),
@@ -74,8 +73,6 @@ export async function createBook(
           card.result.sourceId,
           card.result.author,
           card.result.sourceUrl,
-          card.audioStatus,
-          card.audioStatus,
           error ? "LOOKUP_INCOMPLETE" : null,
           error ? "辞書または例文が見つかりませんでした" : null,
         );
@@ -123,8 +120,6 @@ export async function findStudyCard(db: D1Database, userId: string, bookId: stri
       id: row.id,
       bookId: row.book_id,
       term: row.term,
-      termAudioKey: row.term_audio_key,
-      termAudioStatus: row.term_audio_status,
     };
   }
   return {
@@ -136,11 +131,23 @@ export async function findStudyCard(db: D1Database, userId: string, bookId: stri
     sentenceSourceId: row.sentence_source_id,
     sentenceAuthor: row.sentence_author,
     sentenceSourceUrl: row.sentence_source_url,
-    termAudioKey: row.term_audio_key,
-    sentenceAudioKey: row.sentence_audio_key,
-    termAudioStatus: row.term_audio_status,
-    sentenceAudioStatus: row.sentence_audio_status,
   };
+}
+
+export type AudioKind = "term" | "sentence";
+
+export async function findAudioText(db: D1Database, userId: string, cardId: string, kind: AudioKind): Promise<string | null> {
+  const column = kind === "term" ? "c.term" : "c.sentence";
+  const row = await db
+    .prepare(
+      `SELECT ${column} AS text
+       FROM cards c
+       JOIN study_books b ON b.id = c.book_id AND b.user_id = ?
+       WHERE c.id = ?`,
+    )
+    .bind(userId, cardId)
+    .first<{ text: string | null }>();
+  return row?.text ?? null;
 }
 
 export async function saveReview(

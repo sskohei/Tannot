@@ -7,15 +7,9 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "tannot-db",
-      "database_id": "local",
+      "database_name": "tannot",
+      "database_id": "97d7b5bd-3c01-468c-ac2d-dfa5cb342c22",
       "migrations_dir": "db/migrations"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "AUDIO",
-      "bucket_name": "tannot-audio"
     }
   ],
   "assets": {
@@ -23,7 +17,22 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "AUDIO_BASE_URL": "http://localhost:8787/audio",
     "FREE_BOOK_LIMIT": "3"
+  },
+  "env": {
+    "staging": {
+      "name": "tannot-staging",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "tannot-staging",
+          "database_id": "83eb9c6e-25f3-439a-b224-83417cf9b4e8",
+          "migrations_dir": "db/migrations"
+        }
+      ],
+      "vars": {
+        "FREE_BOOK_LIMIT": "3"
+      }
+    }
   }
 }
