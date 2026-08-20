@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { AuthButton } from "@/components/AuthButton";
+import Image from "next/image";
 
 export const metadata: Metadata = {
   title: "Tannot",
@@ -13,7 +14,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="ja">
       <body>
         <header className="site-header">
-          <Link href="/" className="brand">Tannot</Link>
+          <Link href="/" className="brand">
+          <Image src="/images/logo.svg" alt="Tannot Logo" width={32} height={32} />
+            Tannot
+          </Link>
           <nav><Link className="button" href="/books">単語帳</Link><AuthButton /></nav>
         </header>
         <main className="container">{children}</main>
