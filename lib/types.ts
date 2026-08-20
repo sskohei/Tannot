@@ -38,10 +38,16 @@ export type StudyBook = {
 
 export type ReviewState = {
   rating: Rating;
+  state: number;
   intervalDays: number;
-  easeFactor: number;
+  stability: number;
+  difficulty: number;
+  elapsedDays: number;
+  learningSteps: number;
+  lapses: number;
   repetitions: number;
   dueAt: Date;
+  reviewedAt: Date;
 };
 
 export type DictionaryResult = {

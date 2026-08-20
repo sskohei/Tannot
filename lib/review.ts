@@ -1,66 +1,92 @@
+import {
+  createEmptyCard,
+  fsrs,
+  Rating as FsrsRating,
+  State as FsrsState,
+  type Card as FsrsCard,
+} from "ts-fsrs";
 import type { Rating, ReviewState } from "./types";
 
-const MIN_EASE = 1.3;
-const MAX_INTERVAL_DAYS = 365;
 const ratings = ["again", "hard", "good", "easy"] as const;
+const scheduler = fsrs({
+  // Keep the current product's one-year cap while using FSRS scheduling.
+  maximum_interval: 365,
+  request_retention: 0.9,
+  // Fuzz is useful in production, but deterministic previews and tests are more
+  // useful until the app has its own scheduling history and settings UI.
+  enable_fuzz: false,
+  enable_short_term: true,
+  learning_steps: ["10m"],
+  relearning_steps: ["10m"],
+});
+
+const fsrsRatings = {
+  again: FsrsRating.Again,
+  hard: FsrsRating.Hard,
+  good: FsrsRating.Good,
+  easy: FsrsRating.Easy,
+} as const;
+
+export type StoredReviewState = Omit<ReviewState, "rating" | "reviewedAt"> & {
+  reviewedAt: Date;
+};
 
 export type ReviewInterval = {
   intervalDays: number;
   intervalMinutes: number | null;
 };
 
+export function createReviewCard(previous: StoredReviewState | null, now: Date): FsrsCard {
+  if (!previous) return createEmptyCard(now);
+
+  return {
+    due: previous.dueAt,
+    stability: previous.stability,
+    difficulty: previous.difficulty,
+    elapsed_days: previous.elapsedDays,
+    scheduled_days: previous.intervalDays,
+    reps: previous.repetitions,
+    lapses: previous.lapses,
+    learning_steps: previous.learningSteps,
+    state: previous.state as FsrsState,
+    last_review: previous.reviewedAt,
+  };
+}
+
+function toReviewState(rating: Rating, card: FsrsCard, now: Date): ReviewState {
+  return {
+    rating,
+    state: card.state,
+    intervalDays: card.scheduled_days,
+    stability: card.stability,
+    difficulty: card.difficulty,
+    elapsedDays: card.elapsed_days,
+    learningSteps: card.learning_steps,
+    lapses: card.lapses,
+    repetitions: card.reps,
+    dueAt: card.due,
+    reviewedAt: now,
+  };
+}
+
 export function calculateReview(
   rating: Rating,
-  previous: Pick<ReviewState, "intervalDays" | "easeFactor" | "repetitions">,
+  previous: StoredReviewState | null,
   now = new Date(),
 ): ReviewState {
-  const easeFactor = Math.max(
-    MIN_EASE,
-    previous.easeFactor + (rating === "easy" ? 0.15 : rating === "hard" ? -0.15 : rating === "again" ? -0.2 : 0),
-  );
-
-  let intervalDays: number;
-  let repetitions: number;
-  switch (rating) {
-    case "again":
-      intervalDays = 0;
-      repetitions = 0;
-      break;
-    case "hard":
-      intervalDays = Math.max(1, Math.round(Math.max(1, previous.intervalDays) * 1.2));
-      repetitions = previous.repetitions + 1;
-      break;
-    case "good":
-      intervalDays = previous.repetitions === 0
-        ? 1
-        : Math.max(1, Math.round(Math.max(1, previous.intervalDays) * easeFactor));
-      repetitions = previous.repetitions + 1;
-      break;
-    case "easy":
-      intervalDays = previous.repetitions === 0
-        ? 4
-        : Math.max(2, Math.round(Math.max(1, previous.intervalDays) * easeFactor * 1.3));
-      repetitions = previous.repetitions + 1;
-      break;
-  }
-
-  intervalDays = Math.min(MAX_INTERVAL_DAYS, intervalDays);
-  const dueAt = new Date(now);
-  if (intervalDays === 0) dueAt.setMinutes(dueAt.getMinutes() + 10);
-  else dueAt.setUTCDate(dueAt.getUTCDate() + intervalDays);
-
-  return { rating, intervalDays, easeFactor, repetitions, dueAt };
+  const result = scheduler.next(createReviewCard(previous, now), now, fsrsRatings[rating]);
+  return toReviewState(rating, result.card, now);
 }
 
 export function getReviewIntervals(
-  previous: Pick<ReviewState, "intervalDays" | "easeFactor" | "repetitions">,
+  previous: StoredReviewState | null,
   now = new Date(),
 ): Record<Rating, ReviewInterval> {
   return Object.fromEntries(ratings.map((rating) => {
     const state = calculateReview(rating, previous, now);
     return [rating, {
       intervalDays: state.intervalDays,
-      intervalMinutes: state.intervalDays === 0 ? Math.round((state.dueAt.getTime() - now.getTime()) / 60_000) : null,
+      intervalMinutes: state.intervalDays === 0 ? Math.max(1, Math.round((state.dueAt.getTime() - now.getTime()) / 60_000)) : null,
     }];
   })) as Record<Rating, ReviewInterval>;
 }
