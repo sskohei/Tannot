@@ -19,7 +19,7 @@
 
 `GET /api/study/next` は `reveal=true` を指定したときだけ訳・例文と各評価の次回復習間隔を返します。通常の取得では英単語とカードIDだけを返し、解答前の情報をクライアントへ渡しません。音声は、学習画面に表示済みの英単語または例文をブラウザのWeb Speech APIで読み上げます。音声データを返すAPIは提供しません。
 
-`POST /api/study/reviews` の入力は `{ "cardId": "...", "rating": "again|hard|good|easy", "requestId": "..." }` です。`requestId` は再送時にも同じ値を使い、レビューの二重適用を防ぎます。
+`POST /api/study/reviews` の入力は `{ "cardId": "...", "rating": "again|hard|good|easy", "requestId": "..." }` です。評価結果はFSRSで次回日時を計算し、`requestId` は再送時にも同じ値を使ってレビューの二重適用を防ぎます。
 
 `POST /api/books` の入力は `{ "title": "...", "input": "run\\ngive up" }` です。入力は最大100件、1項目100文字、全体10,000文字に制限します。空行・重複は正規化して除外します。
 

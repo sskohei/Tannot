@@ -109,6 +109,10 @@ textarea { min-height: 10rem; resize: vertical; }
 .info-panel h2 { color: var(--coral); font-size: 1.15rem; }
 .info-panel p, .info-panel li { color: #655f69; font-size: .85rem; line-height: 1.7; }
 .info-panel ol { margin-bottom: 0; padding-left: 1.25rem; }
+.license-list { display: grid; gap: .75rem; margin: 0; padding-left: 1.25rem; }
+.license-list li { color: #655f69; line-height: 1.7; }
+.license-list a, details summary { color: var(--coral); cursor: pointer; }
+.license-text { background: #fffdf7; border: 1px solid #f0dfc7; border-radius: .75rem; font: .78rem/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; margin: .8rem 0 0; overflow-x: auto; padding: 1rem; white-space: pre-wrap; }
 .grid-copy { display: grid; gap: 1.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 @media (max-width: 600px) {

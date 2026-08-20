@@ -1,5 +1,5 @@
 import type { Card, DictionaryResult, StudyBook } from "@/lib/types";
-import { getReviewIntervals } from "@/lib/review";
+import { getReviewIntervals, type StoredReviewState } from "@/lib/review";
 
 type CardInput = {
   term: string;
@@ -141,7 +141,9 @@ export async function deleteBook(db: D1Database, userId: string, bookId: string)
 }
 
 export async function findStudyCard(db: D1Database, userId: string, bookId: string, reveal: boolean): Promise<Record<string, unknown> | null> {
-  const select = `SELECT c.*, latest.rating, latest.due_at, latest.interval_days, latest.ease_factor, latest.repetitions
+  const select = `SELECT c.*, latest.rating, latest.due_at, latest.interval_days, latest.ease_factor, latest.repetitions,
+      latest.fsrs_state, latest.fsrs_stability, latest.fsrs_difficulty, latest.fsrs_elapsed_days,
+      latest.fsrs_learning_steps, latest.fsrs_lapses, latest.reviewed_at
     FROM cards c
     JOIN study_books b ON b.id = c.book_id AND b.user_id = ?
     LEFT JOIN reviews latest ON latest.id = (
@@ -178,11 +180,8 @@ export async function findStudyCard(db: D1Database, userId: string, bookId: stri
     };
   }
   const now = new Date();
-  const reviewIntervals = getReviewIntervals({
-    intervalDays: Number(row.interval_days ?? 0),
-    easeFactor: Number(row.ease_factor ?? 2.5),
-    repetitions: Number(row.repetitions ?? 0),
-  }, now);
+  const previous = toStoredReviewState(row);
+  const reviewIntervals = getReviewIntervals(previous, now);
   return {
     id: row.id,
     bookId: row.book_id,
@@ -201,34 +200,87 @@ export async function saveReview(
   userId: string,
   cardId: string,
   requestId: string,
-  state: { rating: string; reviewedAt: string; dueAt: string; intervalDays: number; easeFactor: number; repetitions: number },
+  state: ReviewSaveState,
 ): Promise<{ id: string; duplicate: boolean } | null> {
   const existing = await db.prepare("SELECT id FROM reviews WHERE request_id = ? AND user_id = ?").bind(requestId, userId).first<{ id: string }>();
   if (existing) return { id: existing.id, duplicate: true };
   const id = crypto.randomUUID();
   const inserted = await db
     .prepare(
-      `INSERT INTO reviews (id, card_id, user_id, rating, reviewed_at, due_at, interval_days, ease_factor, repetitions, request_id)
-       SELECT ?, c.id, ?, ?, ?, ?, ?, ?, ?, ?
+      `INSERT INTO reviews (
+         id, card_id, user_id, rating, reviewed_at, due_at, interval_days, ease_factor, repetitions,
+         request_id, fsrs_state, fsrs_stability, fsrs_difficulty, fsrs_elapsed_days, fsrs_learning_steps, fsrs_lapses
+       )
+       SELECT ?, c.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
        FROM cards c JOIN study_books b ON b.id = c.book_id
        WHERE c.id = ? AND b.user_id = ?`,
     )
-    .bind(id, userId, state.rating, state.reviewedAt, state.dueAt, state.intervalDays, state.easeFactor, state.repetitions, requestId, cardId, userId)
+    .bind(
+      id, userId, state.rating, state.reviewedAt, state.dueAt, state.intervalDays, 2.5, state.repetitions,
+      requestId, state.state, state.stability, state.difficulty, state.elapsedDays, state.learningSteps, state.lapses,
+      cardId, userId,
+    )
     .run();
   if (inserted.meta.changes === 0) return null;
   return { id, duplicate: false };
 }
 
-export async function latestReview(db: D1Database, userId: string, cardId: string): Promise<{ intervalDays: number; easeFactor: number; repetitions: number } | null> {
+export async function latestReview(db: D1Database, userId: string, cardId: string): Promise<StoredReviewState | null> {
   const result = await db
     .prepare(
-      `SELECT r.interval_days AS intervalDays, r.ease_factor AS easeFactor, r.repetitions
+      `SELECT r.due_at AS dueAt, r.interval_days AS intervalDays, r.fsrs_state AS state,
+              r.fsrs_stability AS stability, r.fsrs_difficulty AS difficulty,
+              r.fsrs_elapsed_days AS elapsedDays, r.fsrs_learning_steps AS learningSteps,
+              r.fsrs_lapses AS lapses, r.repetitions, r.reviewed_at AS reviewedAt
        FROM reviews r JOIN cards c ON c.id = r.card_id JOIN study_books b ON b.id = c.book_id
-       WHERE r.card_id = ? AND b.user_id = ? ORDER BY r.reviewed_at DESC LIMIT 1`,
+       WHERE r.card_id = ? AND b.user_id = ? AND r.fsrs_state IS NOT NULL
+       ORDER BY r.reviewed_at DESC LIMIT 1`,
     )
     .bind(cardId, userId)
-    .first<{ intervalDays: number; easeFactor: number; repetitions: number }>();
-  return result ?? null;
+    .first<Record<string, unknown>>();
+  if (!result) return null;
+  return {
+    dueAt: new Date(String(result.dueAt)),
+    intervalDays: Number(result.intervalDays),
+    state: Number(result.state),
+    stability: Number(result.stability),
+    difficulty: Number(result.difficulty),
+    elapsedDays: Number(result.elapsedDays),
+    learningSteps: Number(result.learningSteps),
+    lapses: Number(result.lapses),
+    repetitions: Number(result.repetitions),
+    reviewedAt: new Date(String(result.reviewedAt)),
+  };
+}
+
+type ReviewSaveState = {
+  rating: string;
+  reviewedAt: string;
+  dueAt: string;
+  intervalDays: number;
+  state: number;
+  stability: number;
+  difficulty: number;
+  elapsedDays: number;
+  learningSteps: number;
+  lapses: number;
+  repetitions: number;
+};
+
+function toStoredReviewState(row: Record<string, unknown>): StoredReviewState | null {
+  if (row.fsrs_state === null || row.fsrs_state === undefined) return null;
+  return {
+    dueAt: new Date(String(row.due_at)),
+    intervalDays: Number(row.interval_days),
+    state: Number(row.fsrs_state),
+    stability: Number(row.fsrs_stability),
+    difficulty: Number(row.fsrs_difficulty),
+    elapsedDays: Number(row.fsrs_elapsed_days),
+    learningSteps: Number(row.fsrs_learning_steps),
+    lapses: Number(row.fsrs_lapses),
+    repetitions: Number(row.repetitions),
+    reviewedAt: new Date(String(row.reviewed_at)),
+  };
 }
 
 export async function findSubscription(db: D1Database, userId: string): Promise<{ status: string; current_period_end: string | null } | null> {

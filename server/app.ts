@@ -175,7 +175,7 @@ app.post("/api/study/reviews", async (c) => {
   if (!cardId) return jsonError("VALIDATION_ERROR", "cardIdが必要です", 400);
   const rating = parseRating(body.rating);
   const requestId = parseRequestId(body.requestId);
-  const previous = (await latestReview(c.env.DB, user.id, cardId)) ?? { intervalDays: 0, easeFactor: 2.5, repetitions: 0 };
+  const previous = await latestReview(c.env.DB, user.id, cardId);
   const now = new Date();
   const state = calculateReview(rating, previous, now);
   const saved = await saveReview(c.env.DB, user.id, cardId, requestId, {
@@ -183,7 +183,12 @@ app.post("/api/study/reviews", async (c) => {
     reviewedAt: now.toISOString(),
     dueAt: state.dueAt.toISOString(),
     intervalDays: state.intervalDays,
-    easeFactor: state.easeFactor,
+    state: state.state,
+    stability: state.stability,
+    difficulty: state.difficulty,
+    elapsedDays: state.elapsedDays,
+    learningSteps: state.learningSteps,
+    lapses: state.lapses,
     repetitions: state.repetitions,
   });
   if (!saved) return jsonError("NOT_FOUND", "学習カードが見つかりません", 404);

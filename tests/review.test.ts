@@ -1,30 +1,40 @@
 import { describe, expect, it } from "vitest";
 import { calculateReview, getReviewIntervals } from "@/lib/review";
 
-describe("review schedule", () => {
+describe("FSRS review schedule", () => {
   const now = new Date("2026-01-01T00:00:00.000Z");
 
-  it("uses a short retry for again and increases repetitions for good", () => {
-    const again = calculateReview("again", { intervalDays: 10, easeFactor: 2.5, repetitions: 3 }, now);
-    expect(again.intervalDays).toBe(0);
-    expect(again.dueAt.toISOString()).toBe("2026-01-01T00:10:00.000Z");
-
-    const good = calculateReview("good", { intervalDays: 1, easeFactor: 2.5, repetitions: 1 }, now);
-    expect(good.intervalDays).toBe(3);
-    expect(good.repetitions).toBe(2);
+  it("previews FSRS intervals for a new card", () => {
+    expect(getReviewIntervals(null, now)).toEqual({
+      again: { intervalDays: 0, intervalMinutes: 10 },
+      hard: { intervalDays: 0, intervalMinutes: 15 },
+      good: { intervalDays: 2, intervalMinutes: null },
+      easy: { intervalDays: 8, intervalMinutes: null },
+    });
   });
 
-  it("keeps the ease factor above the safety minimum", () => {
-    const result = calculateReview("hard", { intervalDays: 1, easeFactor: 1.3, repetitions: 1 }, now);
-    expect(result.easeFactor).toBe(1.3);
+  it("stores FSRS memory state and advances a graduated card", () => {
+    const first = calculateReview("good", null, now);
+    expect(first.state).toBe(2);
+    expect(first.intervalDays).toBe(2);
+    expect(first.repetitions).toBe(1);
+    expect(first.stability).toBeGreaterThan(0);
+    expect(first.difficulty).toBeGreaterThan(0);
+
+    const next = calculateReview("good", first, new Date("2026-01-03T00:00:00.000Z"));
+    expect(next.state).toBe(2);
+    expect(next.intervalDays).toBe(11);
+    expect(next.repetitions).toBe(2);
+    expect(next.dueAt.toISOString()).toBe("2026-01-14T00:00:00.000Z");
   });
 
-  it("returns the next interval for every rating", () => {
-    const intervals = getReviewIntervals({ intervalDays: 0, easeFactor: 2.5, repetitions: 0 }, now);
+  it("moves a forgotten review card to relearning", () => {
+    const first = calculateReview("good", null, now);
+    const forgotten = calculateReview("again", first, new Date("2026-01-03T00:00:00.000Z"));
 
-    expect(intervals.again).toEqual({ intervalDays: 0, intervalMinutes: 10 });
-    expect(intervals.hard).toEqual({ intervalDays: 1, intervalMinutes: null });
-    expect(intervals.good).toEqual({ intervalDays: 1, intervalMinutes: null });
-    expect(intervals.easy).toEqual({ intervalDays: 4, intervalMinutes: null });
+    expect(forgotten.state).toBe(3);
+    expect(forgotten.intervalDays).toBe(0);
+    expect(forgotten.lapses).toBe(1);
+    expect(forgotten.dueAt.toISOString()).toBe("2026-01-03T00:10:00.000Z");
   });
 });
