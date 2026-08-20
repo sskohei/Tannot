@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
@@ -27,7 +28,15 @@ function subscriptionLabel(subscription: Subscription | null): string {
   return "無料プラン";
 }
 
+async function requestSettings(): Promise<Me> {
+  const response = await fetch("/api/me", { credentials: "include" });
+  const data = await response.json() as Me & { error?: { message?: string } };
+  if (!response.ok || !data.user) throw new Error(data.error?.message ?? "設定を読み込めませんでした");
+  return data;
+}
+
 export default function SettingsPage() {
+  const router = useRouter();
   const { data: session, isPending: isSessionPending } = authClient.useSession();
   const userId = session?.user.id;
   const [me, setMe] = useState<Me | null>(null);
@@ -41,10 +50,7 @@ export default function SettingsPage() {
     setIsLoadingSettings(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/me", { credentials: "include" });
-      const data = await response.json() as Me & { error?: { message?: string } };
-      if (!response.ok || !data.user) throw new Error(data.error?.message ?? "設定を読み込めませんでした");
-      setMe(data);
+      setMe(await requestSettings());
     } catch (error) {
       setMe(null);
       setMessage(error instanceof Error ? error.message : "設定を読み込めませんでした");
@@ -55,13 +61,21 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (isSessionPending) return;
-    if (!userId) {
+    if (!userId) return;
+    let cancelled = false;
+    void requestSettings().then((data) => {
+      if (cancelled) return;
+      setMe(data);
+      setMessage(null);
+    }).catch((error: unknown) => {
+      if (cancelled) return;
       setMe(null);
-      setIsLoadingSettings(false);
-      return;
-    }
-    void loadSettings();
-  }, [isSessionPending, loadSettings, userId]);
+      setMessage(error instanceof Error ? error.message : "設定を読み込めませんでした");
+    }).finally(() => {
+      if (!cancelled) setIsLoadingSettings(false);
+    });
+    return () => { cancelled = true; };
+  }, [isSessionPending, userId]);
 
   async function openBilling(path: "/api/billing/checkout" | "/api/billing/portal") {
     setLoading(true);
@@ -113,7 +127,7 @@ export default function SettingsPage() {
         const data = await response.json() as { error?: { message?: string } };
         throw new Error(data.error?.message ?? "アカウントを削除できません");
       }
-      window.location.assign("/");
+      router.push("/");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "アカウントを削除できません");
       setLoading(false);

@@ -262,7 +262,7 @@ app.post("/api/study/reviews", async (c) => {
 app.post("/api/billing/checkout", async (c) => {
   const user = await requireUser(c);
   if (!c.env.STRIPE_SECRET_KEY || !c.env.STRIPE_PRICE_ID) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
-  const body = await c.req.json<{ termsAccepted?: unknown }>().catch(() => ({}));
+  const body = await c.req.json<{ termsAccepted?: unknown }>().catch((): { termsAccepted?: unknown } => ({}));
   if (body.termsAccepted !== true) return jsonError("TERMS_REQUIRED", "利用規約とプライバシーポリシーへの同意が必要です", 400);
   const existingSubscription = await findSubscription(c.env.DB, user.id);
   if (isPremiumStatus(existingSubscription?.status)) return jsonError("ALREADY_SUBSCRIBED", "すでにプレミアムプランをご利用中です", 409);
