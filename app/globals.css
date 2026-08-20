@@ -26,7 +26,8 @@ h2 { line-height: 1.1; }
 
 .site-header { align-items: center; display: flex; justify-content: space-between; margin: 0 auto; max-width: 960px; padding: 1.25rem 1rem .5rem; }
 .site-header nav { align-items: center; display: flex; gap: .7rem; }
-.brand { color: var(--coral); font-size: 1.35rem; font-weight: 900; letter-spacing: -.04em; }
+.brand { align-items: center; color: var(--coral); display: inline-flex; font-size: 1.35rem; font-weight: 900; gap: .45rem; letter-spacing: -.04em; line-height: 1; }
+.brand img { display: block; height: 1.5rem; width: 1.5rem; }
 .nav-link { font-size: .82rem; font-weight: 800; }
 .nav-link:hover { color: var(--coral); }
 .container { margin: 0 auto; max-width: 960px; min-height: calc(100vh - 9rem); padding: 2rem 1rem 4rem; }
