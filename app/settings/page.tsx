@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { authClient } from "@/lib/auth-client";
 
 type Subscription = {
   status: string;
@@ -27,17 +28,40 @@ function subscriptionLabel(subscription: Subscription | null): string {
 }
 
 export default function SettingsPage() {
+  const { data: session, isPending: isSessionPending } = authClient.useSession();
+  const userId = session?.user.id;
   const [me, setMe] = useState<Me | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+  const loadSettings = useCallback(async () => {
+    if (!userId) return;
+    setIsLoadingSettings(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/me", { credentials: "include" });
+      const data = await response.json() as Me & { error?: { message?: string } };
+      if (!response.ok || !data.user) throw new Error(data.error?.message ?? "設定を読み込めませんでした");
+      setMe(data);
+    } catch (error) {
+      setMe(null);
+      setMessage(error instanceof Error ? error.message : "設定を読み込めませんでした");
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  }, [userId]);
 
   useEffect(() => {
-    fetch("/api/me").then(async (response) => {
-      const data = await response.json() as Me;
-      setMe(data);
-    }).catch(() => setMessage("設定を読み込めませんでした"));
-  }, []);
+    if (isSessionPending) return;
+    if (!userId) {
+      setMe(null);
+      setIsLoadingSettings(false);
+      return;
+    }
+    void loadSettings();
+  }, [isSessionPending, loadSettings, userId]);
 
   async function openBilling(path: "/api/billing/checkout" | "/api/billing/portal") {
     setLoading(true);
@@ -96,8 +120,9 @@ export default function SettingsPage() {
     }
   }
 
-  if (!me) return <p className="muted">設定を読み込み中…</p>;
-  if (!me.user) return <section className="panel pop-shadow stack"><h1>設定・プラン</h1><p>プランとデータを管理するにはログインしてください。</p><Link className="button" href="/login">Googleでログイン</Link></section>;
+  if (isSessionPending || (session && isLoadingSettings)) return <p className="muted">設定を読み込み中…</p>;
+  if (!session) return <section className="panel pop-shadow stack"><h1>設定・プラン</h1><p>プランとデータを管理するにはログインしてください。</p><Link className="button" href="/login">Googleでログイン</Link></section>;
+  if (!me) return <section className="panel pop-shadow stack"><h1>設定・プラン</h1><p>ログイン状態は確認できましたが、プラン情報を取得できませんでした。</p>{message && <p className="error" role="alert">{message}</p>}<div className="actions"><button className="button" onClick={() => void loadSettings()}>再試行</button><Link className="button secondary" href="/books">単語帳へ戻る</Link></div></section>;
 
   const premium = isPremium(me.subscription);
   const periodEnd = me.subscription?.current_period_end ? new Date(me.subscription.current_period_end).toLocaleDateString("ja-JP") : null;
