@@ -19,8 +19,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             Tannot
           </Link>
           <nav>
-            <Link className="nav-link" href="/pricing">料金</Link>
-            <Link className="nav-link" href="/settings">設定</Link>
+            <Link className="button secondary" href="/pricing">料金</Link>
+            <Link className="button secondary" href="/settings">プラン</Link>
             <Link className="button" href="/books">単語帳</Link>
             <AuthButton />
           </nav>
