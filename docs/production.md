@@ -40,6 +40,14 @@ npm test
 npm run build
 ```
 
+## プレミアム公開前チェック
+
+- Stripeの本番Product / Priceを「プレミアム・月額500円（税込）」として作成し、`STRIPE_PRICE_ID`を設定する。
+- Stripe Checkoutの決済手段でカード、Apple Pay、Google Payを有効にする。Apple Pay・Google Payを表示する本番ドメインおよびステージングドメインは、Stripe DashboardのPayment method domainsへ登録する。
+- Stripe Customer Portalで、支払い方法の更新、請求書の閲覧、期間末での解約を有効にし、返却先URLを本番ドメインへ設定する。
+- `customer.subscription.created`、`customer.subscription.updated`、`customer.subscription.deleted`、`checkout.session.completed` を本番webhook endpointへ送信する。
+- 料金、利用規約、プライバシーポリシー、特定商取引法に基づく表記を公開状態で確認する。
+
 ステージングWorkerのデプロイは `npm run deploy -- --env staging` で実行します。デプロイ前に、ステージング用のCloudflare secret、OAuth/Stripe endpointを登録し、本番のsecret・データベース設定を共有していないことを確認します。
 
 `CLOUDFLARE_API_TOKEN` がない場合、Wranglerのremote確認・migrationは実行できません。tokenはリポジトリへ保存せず、CloudflareまたはCIのsecretとして設定します。

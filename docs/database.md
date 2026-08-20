@@ -5,11 +5,11 @@ Cloudflare D1 は SQLite のため、スキーマ変更は `wrangler d1 migratio
 | テーブル | 主なカラム | 目的 |
 | --- | --- | --- |
 | user / account / session / verification | Better Auth標準カラム | Google OAuthとセッション |
-| users | id, email, name, created_at | アプリケーション側のユーザー参照 |
+| users | id, email, name, created_at, terms_accepted_at, privacy_accepted_at | アプリケーション側のユーザー参照とプレミアム購入時の同意記録 |
 | study_books | id, user_id, title, created_at, updated_at | 単語帳 |
 | cards | id, book_id, term, normalized_term, translation, sentence, sentence_source_id | 単語カードのスナップショットと出典。音声は保存しない |
 | reviews | id, card_id, user_id, rating, reviewed_at, due_at, interval_days, repetitions, fsrs_state, fsrs_stability, fsrs_difficulty, fsrs_elapsed_days, fsrs_learning_steps, fsrs_lapses | 学習履歴とFSRS状態。`ease_factor` は旧アルゴリズム互換用 |
-| subscriptions | user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end | 課金状態 |
+| subscriptions | user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, cancel_at_period_end, last_event_created_at | 課金状態とwebhookの順序管理 |
 | stripe_events | event_id, received_at | webhook の冪等性 |
 
 ## 辞書・例文データ
@@ -36,3 +36,7 @@ EJDict と Tatoeba の生データをリクエスト時に読み込まず、EJCS
 - カード削除時のレビュー削除は外部キーまたは明示的なトランザクションで保証する。
 - レビュー送信には `request_id` またはクライアント側イベント ID を持たせ、二重送信を冪等に処理する。
 - 時刻は ISO 8601 または Unix epoch のどちらかに統一し、プロジェクト開始時に決定する。
+
+## アカウントデータ
+
+利用者は、自分の単語帳・カード・学習履歴をJSONで出力できる。アカウント削除は、有効なプレミアム契約がない場合に受け付ける。削除時は、単語帳、カード、レビュー、アプリケーション側のユーザー情報、認証セッションおよび契約状態を削除する。Stripeの請求情報やイベント受信記録は、請求・不正利用対応または法令上必要な期間に限り、各システムで保持され得る。

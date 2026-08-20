@@ -9,6 +9,16 @@ type CardInput = {
 
 type User = { id: string; email: string; name: string };
 
+export type Subscription = {
+  user_id: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  status: string;
+  current_period_end: string | null;
+  cancel_at_period_end: number;
+  last_event_created_at: number;
+};
+
 export async function ensureUser(db: D1Database, user: User): Promise<void> {
   await db
     .prepare(
@@ -17,6 +27,13 @@ export async function ensureUser(db: D1Database, user: User): Promise<void> {
     )
     .bind(user.id, user.email, user.name)
     .run();
+}
+
+export async function recordPolicyAcceptance(db: D1Database, userId: string): Promise<void> {
+  const acceptedAt = new Date().toISOString();
+  await db.prepare(
+    "UPDATE users SET terms_accepted_at = ?, privacy_accepted_at = ? WHERE id = ?",
+  ).bind(acceptedAt, acceptedAt, userId).run();
 }
 
 export async function countUserBooks(db: D1Database, userId: string): Promise<number> {
@@ -283,6 +300,72 @@ function toStoredReviewState(row: Record<string, unknown>): StoredReviewState | 
   };
 }
 
-export async function findSubscription(db: D1Database, userId: string): Promise<{ status: string; current_period_end: string | null } | null> {
-  return db.prepare("SELECT status, current_period_end FROM subscriptions WHERE user_id = ?").bind(userId).first();
+export async function findSubscription(db: D1Database, userId: string): Promise<Subscription | null> {
+  return db.prepare(
+    `SELECT user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end,
+            cancel_at_period_end, last_event_created_at
+     FROM subscriptions WHERE user_id = ?`,
+  ).bind(userId).first<Subscription>();
+}
+
+export async function saveSubscription(
+  db: D1Database,
+  subscription: Omit<Subscription, "user_id"> & { userId: string },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO subscriptions (
+       user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end,
+       cancel_at_period_end, last_event_created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET
+       stripe_customer_id = excluded.stripe_customer_id,
+       stripe_subscription_id = excluded.stripe_subscription_id,
+       status = excluded.status,
+       current_period_end = excluded.current_period_end,
+       cancel_at_period_end = excluded.cancel_at_period_end,
+       last_event_created_at = excluded.last_event_created_at
+     WHERE excluded.last_event_created_at >= subscriptions.last_event_created_at`,
+  ).bind(
+    subscription.userId,
+    subscription.stripe_customer_id,
+    subscription.stripe_subscription_id,
+    subscription.status,
+    subscription.current_period_end,
+    subscription.cancel_at_period_end,
+    subscription.last_event_created_at,
+  ).run();
+}
+
+export async function exportUserData(db: D1Database, userId: string): Promise<Record<string, unknown>> {
+  const [books, cards, reviews] = await Promise.all([
+    db.prepare("SELECT id, title, created_at, updated_at FROM study_books WHERE user_id = ? ORDER BY created_at").bind(userId).all<Record<string, unknown>>(),
+    db.prepare(
+      `SELECT c.id, c.book_id, c.term, c.translation, c.sentence, c.sentence_source_id,
+              c.sentence_author, c.sentence_source_url, c.created_at
+       FROM cards c JOIN study_books b ON b.id = c.book_id
+       WHERE b.user_id = ? ORDER BY c.created_at`,
+    ).bind(userId).all<Record<string, unknown>>(),
+    db.prepare(
+      `SELECT r.card_id, r.rating, r.reviewed_at, r.due_at, r.interval_days, r.repetitions
+       FROM reviews r WHERE r.user_id = ? ORDER BY r.reviewed_at`,
+    ).bind(userId).all<Record<string, unknown>>(),
+  ]);
+  return {
+    exportedAt: new Date().toISOString(),
+    books: books.results,
+    cards: cards.results,
+    reviews: reviews.results,
+  };
+}
+
+export async function deleteUserData(db: D1Database, userId: string): Promise<void> {
+  await db.batch([
+    db.prepare("DELETE FROM reviews WHERE user_id = ?").bind(userId),
+    db.prepare("DELETE FROM study_books WHERE user_id = ?").bind(userId),
+    db.prepare("DELETE FROM subscriptions WHERE user_id = ?").bind(userId),
+    db.prepare("DELETE FROM session WHERE userId = ?").bind(userId),
+    db.prepare("DELETE FROM account WHERE userId = ?").bind(userId),
+    db.prepare("DELETE FROM users WHERE id = ?").bind(userId),
+    db.prepare("DELETE FROM user WHERE id = ?").bind(userId),
+  ]);
 }

@@ -11,6 +11,7 @@ export type Bindings = {
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_ID?: string;
   FREE_BOOK_LIMIT?: string;
+  FREE_CARDS_PER_BOOK_LIMIT?: string;
 };
 
 export type Card = {

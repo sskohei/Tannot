@@ -21,10 +21,11 @@
 - 本番リソースのdatabase_idとremote migration手順は [`docs/production.md`](./production.md) を確認する。
 - デプロイ後にログイン、単語帳作成、音声再生、レビュー保存、Checkout、webhook を確認する。
 - webhook は再送される前提で、`stripe_events` による冪等性を確認する。
+- Stripe Dashboardでカード、Apple Pay、Google Payを有効化し、本番・ステージングそれぞれのHTTPSドメインをPayment method domainsとして登録する。Customer Portalでは、支払い方法の更新、請求書の閲覧、期間末での解約を有効化する。
 
 ## 必須情報の例
 
-`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`STRIPE_SECRET_KEY`、`STRIPE_WEBHOOK_SECRET`、`STRIPE_PRICE_ID`、D1 binding名。実際の変数名は `.env.example` と `wrangler.jsonc` を正とします。
+`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`STRIPE_SECRET_KEY`、`STRIPE_WEBHOOK_SECRET`、`STRIPE_PRICE_ID`、`FREE_BOOK_LIMIT`、`FREE_CARDS_PER_BOOK_LIMIT`、D1 binding名。実際の変数名は `.env.example` と `wrangler.jsonc` を正とします。
 
 ## Google OAuth redirect URI
 
