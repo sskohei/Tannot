@@ -18,10 +18,19 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <Image src="/images/logo.svg" alt="Tannot Logo" width={32} height={32} />
             Tannot
           </Link>
-          <nav><Link className="button" href="/books">単語帳</Link><AuthButton /></nav>
+          <nav>
+            <Link className="button secondary" href="/pricing">料金</Link>
+            <Link className="button secondary" href="/settings">プラン</Link>
+            <Link className="button" href="/books">単語帳</Link>
+            <AuthButton />
+          </nav>
         </header>
         <main className="container">{children}</main>
-        <footer className="site-footer"><div>Dictionary data from EJDict, licensed under CC0 1.0 Universal.</div><div>Example sentences from the <a href="https://tatoeba.org/" target="_blank" rel="noopener noreferrer">Tatoeba Project</a>, licensed under CC BY 2.0 FR.</div><div><Link href="/licenses">OSS・データのライセンス</Link></div></footer>
+        <footer className="site-footer">
+          <div>Dictionary data from EJDict, licensed under CC0 1.0 Universal.</div>
+          <div>Example sentences from the <a href="https://tatoeba.org/" target="_blank" rel="noopener noreferrer">Tatoeba Project</a>, licensed under CC BY 2.0 FR.</div>
+          <div className="footer-links"><Link href="/pricing">料金</Link><Link href="/legal/terms">利用規約</Link><Link href="/legal/privacy">プライバシーポリシー</Link><Link href="/legal/commercial-transactions">特定商取引法に基づく表記</Link><Link href="/licenses">OSS・データのライセンス</Link></div>
+        </footer>
       </body>
     </html>
   );

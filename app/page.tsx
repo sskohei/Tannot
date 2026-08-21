@@ -8,7 +8,7 @@ export default function HomePage() {
         <p className="eyebrow">ENGLISH → YOUR MEMORY</p>
         <h1>英単語を、ぽんっと単語帳に。<span>使える記憶へ、軽やかに。</span></h1>
         <p>英単語リストを入力するだけで、訳・例文・音声つきの単語帳を作れます。忘れかけたタイミングの復習まで、Tannotがそっと手伝います。</p>
-        <div className="hero-actions"><Link className="button" href="/books">単語帳を作る</Link><AuthButton /></div>
+        <div className="hero-actions"><Link className="button" href="/books">単語帳を作る</Link><Link className="button secondary" href="/pricing">料金を見る</Link><AuthButton /></div>
       </section>
       <section className="info-panel">
         <div className="grid-copy">

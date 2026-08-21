@@ -17,7 +17,8 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "FREE_BOOK_LIMIT": "3"
+    "FREE_BOOK_LIMIT": "3",
+    "FREE_CARDS_PER_BOOK_LIMIT": "100"
   },
   "env": {
     "staging": {
@@ -31,7 +32,8 @@
         }
       ],
       "vars": {
-        "FREE_BOOK_LIMIT": "3"
+        "FREE_BOOK_LIMIT": "3",
+        "FREE_CARDS_PER_BOOK_LIMIT": "100"
       }
     }
   }
