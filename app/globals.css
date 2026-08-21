@@ -90,6 +90,9 @@ textarea { min-height: 10rem; resize: vertical; }
 .preview-table thead th { color: var(--muted); font-size: .75rem; white-space: nowrap; }
 .preview-table tbody th { font-size: .95rem; white-space: nowrap; }
 .preview-table tbody td { line-height: 1.6; }
+.translation-preview { max-height: calc(1.6em * 3); overflow: hidden; }
+.translation-preview.is-expanded { max-height: none; }
+.translation-toggle { background: transparent; border: 0; color: var(--coral); font-size: .8rem; font-weight: 800; padding: .25rem 0 0; text-decoration: underline; text-underline-offset: .15em; }
 .preview-table tbody tr:last-child th, .preview-table tbody tr:last-child td { border-bottom: 0; }
 .actions { display: flex; flex-wrap: wrap; gap: .7rem; }
 .error, .success { border: 2px solid; border-radius: 1rem; padding: .8rem 1rem; }
