@@ -21,10 +21,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <Image src="/images/logo.svg" alt="Tannot Logo" width={32} height={32} />
             Tannot
           </Link>
-          <nav className="site-nav" aria-label="メインナビゲーション">
-            <Link className="nav-link nav-optional" href="/pricing">料金</Link>
-            <Link className="nav-link nav-optional" href="/settings">プラン</Link>
-            <Link className="button secondary nav-dashboard" href="/dashboard">今日の復習</Link>
+          <nav aria-label="メインナビゲーション">
+            <Link className="button secondary" href="/pricing">料金</Link>
+            <Link className="button secondary" href="/settings">プラン</Link>
+            <Link className="button secondary" href="/dashboard">今日の復習</Link>
             <Link className="button" href="/books">単語帳</Link>
             <AuthButton />
           </nav>
