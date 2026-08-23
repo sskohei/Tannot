@@ -20,7 +20,7 @@ export default function BooksPage() {
     {showCreateForm && <BookForm onCreated={() => { setShowCreateForm(false); setNotice("新しい単語帳を作成しました"); setRefreshKey((key) => key + 1); }} />}
     {selectedBook && <AddCardsForm bookId={selectedBook.id} bookTitle={selectedBook.title} onCancel={() => setSelectedBookId(null)} onAdded={(addedCount, skippedTerms) => { setSelectedBookId(null); setRefreshKey((key) => key + 1); setNotice(addedCount > 0 ? `${addedCount}語を追加しました${skippedTerms.length > 0 ? `（${skippedTerms.length}語は登録済み）` : ""}` : "入力した単語はすべて登録済みです"); }} />}
     {notice && <p className="success" role="status">{notice}</p>}
-    {error && <p className="error">{error}（ログインが必要な場合があります）</p>}
+    {error && <p className="error">{error}</p>}
     <section className="stack"><div className="section-title"><h2>保存済み</h2></div><div className="book-grid">{books.map((book) => <article className="book-card" key={book.id}><h3>{book.title}</h3><p className="muted">{new Date(book.created_at).toLocaleDateString("ja-JP")}</p><div className="actions"><button className="button secondary" onClick={() => { setSelectedBookId(book.id); setShowCreateForm(false); setNotice(null); }}>単語を追加</button><Link className="button secondary" href={`/books/${book.id}`}>詳細</Link><Link className="button" href={`/study/${book.id}`}>学習</Link></div></article>)}</div>{books.length === 0 && !error && <p className="muted">まだ単語帳がありません。</p>}</section>
   </div>;
 }
