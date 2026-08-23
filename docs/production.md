@@ -34,6 +34,7 @@ npx wrangler d1 migrations apply tannot-staging --remote --env staging
 
 ```bash
 npm run check:production-config
+npm run check:secrets
 npm run lint
 npm run typecheck
 npm test
@@ -45,8 +46,20 @@ npm run build
 - Stripeの本番Product / Priceを「プレミアム・月額500円（税込）」として作成し、`STRIPE_PRICE_ID`を設定する。
 - Stripe Checkoutの決済手段でカード、Apple Pay、Google Payを有効にする。Apple Pay・Google Payを表示する本番ドメインおよびステージングドメインは、Stripe DashboardのPayment method domainsへ登録する。
 - Stripe Customer Portalで、支払い方法の更新、請求書の閲覧、期間末での解約を有効にし、返却先URLを本番ドメインへ設定する。
-- `customer.subscription.created`、`customer.subscription.updated`、`customer.subscription.deleted`、`checkout.session.completed` を本番webhook endpointへ送信する。
+- 次のイベントを本番webhook endpointへ送信する。
+  - `checkout.session.completed`
+  - `checkout.session.expired`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+  - `customer.subscription.trial_will_end`
+  - `invoice.paid`
+  - `invoice.payment_failed`
+  - `invoice.payment_action_required`
+  - `invoice.finalization_failed`
 - 料金、利用規約、プライバシーポリシー、特定商取引法に基づく表記を公開状態で確認する。
+- Stripeの顧客メールで支払い成功時の領収書と支払い失敗通知を有効にする。
+- 正式リリース前は [`release-checklist.md`](./release-checklist.md) の実機、アクセシビリティ、法務・サポート確認を完了する。
 
 ステージングWorkerのデプロイは `npm run deploy -- --env staging` で実行します。デプロイ前に、ステージング用のCloudflare secret、OAuth/Stripe endpointを登録し、本番のsecret・データベース設定を共有していないことを確認します。
 

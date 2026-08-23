@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { POLICY_EFFECTIVE_DATE_JA, PRIVACY_VERSION } from "@/lib/policies";
 
 export default function PrivacyPage() {
   return <article className="legal-page stack">
-    <div><p className="eyebrow">PRIVACY POLICY</p><h1>プライバシーポリシー</h1><p className="muted">施行日：2026年8月21日</p></div>
+    <div><p className="eyebrow">PRIVACY POLICY</p><h1>プライバシーポリシー</h1><p className="muted">施行日：{POLICY_EFFECTIVE_DATE_JA}／版：{PRIVACY_VERSION}</p></div>
     <section><h2>1. 基本方針</h2><p>黒川皓平（以下「当方」といいます。）は、Tannot（以下「本サービス」といいます。）で取り扱う個人情報を、個人情報保護法その他の関係法令に従い適切に取り扱います。</p></section>
     <section><h2>2. 取得する情報</h2><ul><li>Googleログインにより取得する氏名、メールアドレス、プロフィール画像、アカウント識別子その他認証に必要な情報</li><li>利用者が登録する単語帳、単語・熟語、カード、学習履歴および設定情報</li><li>IPアドレス、Cookie、端末・ブラウザ情報、アクセス日時および不正利用防止に必要なログ</li><li>Stripeを通じた契約状態、決済識別子、規約・ポリシーへの同意日時および請求に必要な情報</li></ul><p>当方はクレジットカード番号その他の決済情報を保持せず、Stripeが取り扱います。</p></section>
     <section><h2>3. 利用目的</h2><ul><li>本サービスの提供、本人確認、単語帳・学習機能の保存およびデータ出力</li><li>プレミアムの課金、契約管理、請求、決済不正の防止および問い合わせ対応</li><li>障害対応、セキュリティ確保および本サービスの改善</li><li>法令上の義務の履行および利用規約違反への対応</li></ul><p>当方は、サービス運営に必要な通知を除き、事前の同意なく広告・宣伝目的のメールを送信しません。</p></section>

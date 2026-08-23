@@ -5,15 +5,20 @@
 | Method | Path | 内容 |
 | --- | --- | --- |
 | GET | `/api/me` | 現在のユーザーと利用枠 |
+| POST | `/api/account/consent` | 年齢等の確認と現在の規約版への同意を保存 |
 | GET | `/api/account/export` | 単語帳・カード・学習履歴をJSONで出力 |
 | DELETE | `/api/account` | 無料プランまたは利用終了後のアカウントを削除 |
 | POST | `/api/books/preview` | 新しい単語帳の作成前に訳・例文を確認 |
 | POST | `/api/books` | 入力リストから単語帳を作成 |
 | GET | `/api/books` | 自分の単語帳一覧 |
 | GET | `/api/books/:bookId` | 自分の単語帳詳細 |
+| PATCH | `/api/books/:bookId` | 自分の単語帳名を変更 |
 | POST | `/api/books/:bookId/cards/preview` | 追加前に訳・例文を確認 |
 | POST | `/api/books/:bookId/cards` | 自分の単語帳に単語を追加 |
+| PATCH | `/api/books/:bookId/cards/:cardId` | 自分のカードを編集 |
+| DELETE | `/api/books/:bookId/cards/:cardId` | 自分のカードと学習履歴を削除 |
 | DELETE | `/api/books/:bookId` | 自分の単語帳を削除 |
+| GET | `/api/study/summary` | 単語帳ごとのカード数・現在の復習件数 |
 | GET | `/api/study/next?bookId=` | 次に学習するカード |
 | POST | `/api/study/reviews` | 評価を保存し次回復習日を返す |
 | POST | `/api/billing/checkout` | Stripe Checkout セッション作成 |
@@ -34,7 +39,9 @@
 
 無料プランでは、単語帳は最大3冊、各単語帳のカードは最大100枚です。これらの制限は、作成・追加・プレビューのすべてでサーバー側に適用されます。プレミアムの契約状態はStripe webhookで同期し、`active` または `trialing` の場合のみ制限を解除します。
 
-`POST /api/billing/checkout` は `{ "termsAccepted": true }` を受け取り、利用規約・プライバシーポリシーへの同意日時を保存したうえで、7日間の無料トライアル付き月額プランのStripe Checkoutを作成します。Stripe Dashboardでカード、Apple Pay、Google Payを有効化し、本番ドメインを登録してください。`POST /api/billing/portal` は、支払い方法、請求書および解約を利用者自身で管理するためのCustomer Portalを返します。
+`PATCH /api/books/:bookId` は `{ "title": "変更後の名前" }`、`PATCH /api/books/:bookId/cards/:cardId` は `{ "term": "run", "translation": "走る", "sentence": "I run." }` を受け取ります。カードを編集すると、辞書・例文データと利用者の編集内容を混同しないため、保存済みの例文出典情報を外します。
+
+`POST /api/billing/checkout` は `{ "termsAccepted": true, "eligibilityAccepted": true }` を受け取り、利用規約・プライバシーポリシーの版と同意日時、13歳以上かつ未成年の場合の保護者同意確認を保存したうえで、7日間の無料トライアル付き月額プランのStripe Checkoutを作成します。決済手段はコードで固定せず、Stripe Dashboardの動的決済手段でカード、Apple Pay、Google Payを有効にします。`POST /api/billing/portal` は、支払い方法、請求書および解約を利用者自身で管理するためのCustomer Portalを返します。
 
 ## エラー形式
 

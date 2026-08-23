@@ -15,6 +15,12 @@ type Me = {
   user: { name: string; email: string } | null;
   usage: { books: number; freeBookLimit: number };
   subscription: Subscription | null;
+  policyAcceptance: {
+    terms_version: string | null;
+    privacy_version: string | null;
+    eligibility_confirmed_at: string | null;
+  } | null;
+  currentPolicies: { termsVersion: string; privacyVersion: string };
 };
 
 function isPremium(subscription: Subscription | null): boolean {
@@ -43,6 +49,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedEligibility, setAcceptedEligibility] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   const loadSettings = useCallback(async () => {
@@ -83,7 +90,10 @@ export default function SettingsPage() {
     try {
       const response = await fetch(path, {
         method: "POST",
-        ...(path === "/api/billing/checkout" ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ termsAccepted: acceptedTerms }) } : {}),
+        ...(path === "/api/billing/checkout" ? {
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ termsAccepted: acceptedTerms, eligibilityAccepted: acceptedEligibility }),
+        } : {}),
       });
       const data = await response.json() as { url?: string; error?: { message?: string } };
       if (!response.ok || !data.url) throw new Error(data.error?.message ?? "決済画面を開始できません");
@@ -149,11 +159,13 @@ export default function SettingsPage() {
       {premium && periodEnd && <p className="form-note">{me.subscription?.cancel_at_period_end ? `プレミアムは${periodEnd}まで利用できます。` : `次回の請求予定日は${periodEnd}です。`}</p>}
       {message && <p className="error" role="alert">{message}</p>}
       <div className="actions">
-        {!premium && <button className="button" onClick={() => void openBilling("/api/billing/checkout")} disabled={loading || !acceptedTerms}>7日間無料でプレミアムを試す</button>}
+        {!premium && <button className="button" onClick={() => void openBilling("/api/billing/checkout")} disabled={loading || !acceptedTerms || !acceptedEligibility}>7日間無料でプレミアムを試す</button>}
         {premium && <button className="button secondary" onClick={() => void openBilling("/api/billing/portal")} disabled={loading}>決済・契約を管理</button>}
         <Link className="button secondary" href="/pricing">料金を見る</Link>
       </div>
       {!premium && <label className="consent"><input type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} /> <span><Link href="/legal/terms" target="_blank">利用規約</Link>、<Link href="/legal/privacy" target="_blank">プライバシーポリシー</Link>および<Link href="/legal/commercial-transactions" target="_blank">特定商取引法に基づく表記</Link>を確認し、同意します。</span></label>}
+      {!premium && <label className="consent"><input type="checkbox" checked={acceptedEligibility} onChange={(event) => setAcceptedEligibility(event.target.checked)} /> <span>私は13歳以上です。18歳未満の場合は、プレミアムの申込みについて保護者の同意を得ています。</span></label>}
+      {me.policyAcceptance?.terms_version && <p className="form-note">同意済み規約版：{me.policyAcceptance.terms_version}／プライバシーポリシー版：{me.policyAcceptance.privacy_version ?? "未記録"}</p>}
       <p className="form-note">プレミアムは月額500円（税込）です。7日間の無料トライアル後、初回課金日と同じ日付に毎月自動更新されます。カード、Apple Pay、Google Payに対応しています。</p>
     </section>
     <section className="panel stack">
