@@ -25,11 +25,7 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isPending) return;
-    if (!session) {
-      setChecking(false);
-      return;
-    }
+    if (isPending || !session) return;
     fetch("/api/me").then(async (response) => {
       const data = await response.json() as Me & { error?: { message?: string } };
       if (!response.ok) throw new Error(data.error?.message ?? "登録状態を確認できませんでした");
@@ -59,7 +55,7 @@ export default function OnboardingPage() {
     }
   }
 
-  if (isPending || checking) return <p className="muted" role="status">登録状態を確認中…</p>;
+  if (isPending || (session && checking)) return <p className="muted" role="status">登録状態を確認中…</p>;
   if (!session) return <section className="panel pop-shadow stack"><h1>利用を始める</h1><p>確認を続けるにはログインしてください。</p><Link className="button" href="/login">ログイン画面へ</Link></section>;
 
   return <section className="panel pop-shadow stack onboarding-panel">

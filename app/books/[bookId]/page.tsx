@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { EditableCard, type EditableCardData } from "@/components/EditableCard";
 
@@ -17,21 +17,22 @@ export default function BookDetailPage() {
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const loadBook = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/books/${bookId}`);
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/books/${bookId}`).then(async (response) => {
       const data = await response.json() as { book?: Book; error?: { message?: string } };
       if (!response.ok || !data.book) throw new Error(data.error?.message ?? "単語帳を読み込めませんでした");
+      if (cancelled) return;
       setBook(data.book);
       setTitle(data.book.title);
       setError(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "単語帳を読み込めませんでした");
-    }
-  }, [bookId]);
-
-  useEffect(() => { void loadBook(); }, [loadBook]);
+    }).catch((caught: unknown) => {
+      if (!cancelled) setError(caught instanceof Error ? caught.message : "単語帳を読み込めませんでした");
+    });
+    return () => { cancelled = true; };
+  }, [bookId, refreshKey]);
 
   const filteredCards = useMemo(() => {
     if (!book) return [];
@@ -79,7 +80,7 @@ export default function BookDetailPage() {
     }
   }
 
-  if (error && !book) return <section className="panel stack"><p className="error" role="alert">{error}</p><button className="button secondary" type="button" onClick={() => void loadBook()}>再試行</button></section>;
+  if (error && !book) return <section className="panel stack"><p className="error" role="alert">{error}</p><button className="button secondary" type="button" onClick={() => setRefreshKey((key) => key + 1)}>再試行</button></section>;
   if (!book) return <p className="muted" role="status">読み込み中…</p>;
 
   return <div className="stack">
