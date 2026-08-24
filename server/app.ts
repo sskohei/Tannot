@@ -7,7 +7,7 @@ import { PRIVACY_VERSION, TERMS_VERSION } from "@/lib/policies";
 import { calculateReview } from "@/lib/review";
 import { normalizeTerm, parseCardCopy, parseCardTerm, parseRating, parseRequestId, parseTerms, parseTitle } from "@/lib/validation";
 import type { Bindings } from "@/lib/types";
-import { createAuth } from "@/server/auth";
+import { createAuth, getEnvValue } from "@/server/auth";
 import { findLookupResults } from "@/server/lookup-data";
 import {
   addCards,
@@ -339,7 +339,10 @@ app.post("/api/study/reviews", async (c) => {
 
 app.post("/api/billing/checkout", async (c) => {
   const user = await requireUser(c);
-  if (!c.env.STRIPE_SECRET_KEY || !c.env.STRIPE_PRICE_ID) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
+  const stripeSecretKey = getEnvValue(c.env, "STRIPE_SECRET_KEY");
+  const stripePriceId = getEnvValue(c.env, "STRIPE_PRICE_ID");
+  const appUrl = getEnvValue(c.env, "BETTER_AUTH_URL");
+  if (!stripeSecretKey || !stripePriceId || !appUrl) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
   const body = await c.req.json<{ termsAccepted?: unknown; eligibilityAccepted?: unknown }>()
     .catch((): { termsAccepted?: unknown; eligibilityAccepted?: unknown } => ({}));
   if (body.termsAccepted !== true) return jsonError("TERMS_REQUIRED", "利用規約とプライバシーポリシーへの同意が必要です", 400);
@@ -353,15 +356,15 @@ app.post("/api/billing/checkout", async (c) => {
     privacyVersion: PRIVACY_VERSION,
     confirmEligibility: true,
   });
-  const stripe = createStripeClient(c.env.STRIPE_SECRET_KEY);
+  const stripe = createStripeClient(stripeSecretKey);
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     integration_identifier: checkoutIntegrationIdentifier(),
-    line_items: [{ price: c.env.STRIPE_PRICE_ID, quantity: 1 }],
+    line_items: [{ price: stripePriceId, quantity: 1 }],
     ...(existingSubscription?.stripe_customer_id ? { customer: existingSubscription.stripe_customer_id } : { customer_email: user.email }),
     client_reference_id: user.id,
-    success_url: `${c.env.BETTER_AUTH_URL}/settings?billing=success`,
-    cancel_url: `${c.env.BETTER_AUTH_URL}/settings?billing=cancelled`,
+    success_url: `${appUrl}/settings?billing=success`,
+    cancel_url: `${appUrl}/settings?billing=cancelled`,
     metadata: { userId: user.id },
     subscription_data: { metadata: { userId: user.id }, trial_period_days: 7 },
   });
@@ -370,13 +373,15 @@ app.post("/api/billing/checkout", async (c) => {
 
 app.post("/api/billing/portal", async (c) => {
   const user = await requireUser(c);
-  if (!c.env.STRIPE_SECRET_KEY) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
+  const stripeSecretKey = getEnvValue(c.env, "STRIPE_SECRET_KEY");
+  const appUrl = getEnvValue(c.env, "BETTER_AUTH_URL");
+  if (!stripeSecretKey || !appUrl) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
   const subscription = await findSubscription(c.env.DB, user.id);
   if (!subscription?.stripe_customer_id) return jsonError("BILLING_NOT_FOUND", "管理できる契約がありません", 404);
-  const stripe = createStripeClient(c.env.STRIPE_SECRET_KEY);
+  const stripe = createStripeClient(stripeSecretKey);
   const session = await stripe.billingPortal.sessions.create({
     customer: subscription.stripe_customer_id,
-    return_url: `${c.env.BETTER_AUTH_URL}/settings`,
+    return_url: `${appUrl}/settings`,
   });
   return c.json({ url: session.url });
 });
@@ -399,14 +404,16 @@ app.delete("/api/account", async (c) => {
 });
 
 app.post("/api/billing/webhook", async (c) => {
-  if (!c.env.STRIPE_SECRET_KEY || !c.env.STRIPE_WEBHOOK_SECRET) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
+  const stripeSecretKey = getEnvValue(c.env, "STRIPE_SECRET_KEY");
+  const stripeWebhookSecret = getEnvValue(c.env, "STRIPE_WEBHOOK_SECRET");
+  if (!stripeSecretKey || !stripeWebhookSecret) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
   const signature = c.req.header("stripe-signature");
   if (!signature) return jsonError("INVALID_SIGNATURE", "署名がありません", 400);
   const rawBody = await c.req.text();
-  const stripe = createStripeClient(c.env.STRIPE_SECRET_KEY);
+  const stripe = createStripeClient(stripeSecretKey);
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, signature, c.env.STRIPE_WEBHOOK_SECRET);
+    event = stripe.webhooks.constructEvent(rawBody, signature, stripeWebhookSecret);
   } catch {
     return jsonError("INVALID_SIGNATURE", "webhookの署名を検証できません", 400);
   }

@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import type { Bindings } from "@/lib/types";
 
-function getEnvValue(env: Bindings, key: keyof Bindings): string | undefined {
+export function getEnvValue(env: Bindings, key: keyof Bindings): string | undefined {
   const value = env[key];
   if (typeof value === "string" && value.length > 0) return value;
 
