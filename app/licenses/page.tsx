@@ -27,7 +27,7 @@ const packages = [
   ["next", "16.3.1", "Copyright (c) 2025 Vercel, Inc.", "https://github.com/vercel/next.js"],
   ["react", "19.2.8", "Copyright (c) Meta Platforms, Inc. and affiliates.", "https://github.com/facebook/react"],
   ["react-dom", "19.2.8", "Copyright (c) Meta Platforms, Inc. and affiliates.", "https://github.com/facebook/react"],
-  ["stripe", "18.5.0", "Copyright (C) 2011 Ask Bjørn Hansen; Copyright (C) 2013 Stripe, Inc.", "https://github.com/stripe/stripe-node"],
+  ["stripe", "22.5.0", "Copyright (C) 2011 Ask Bjørn Hansen; Copyright (C) 2013 Stripe, Inc.", "https://github.com/stripe/stripe-node"],
 ] as const;
 
 export default function LicensesPage() {

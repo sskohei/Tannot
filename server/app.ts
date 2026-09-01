@@ -8,6 +8,7 @@ import { calculateReview } from "@/lib/review";
 import { normalizeTerm, parseCardCopy, parseCardTerm, parseRating, parseRequestId, parseTerms, parseTitle } from "@/lib/validation";
 import type { Bindings } from "@/lib/types";
 import { createAuth, getEnvValue } from "@/server/auth";
+import { processStripeWebhookEvent } from "@/server/billing";
 import { findLookupResults } from "@/server/lookup-data";
 import {
   addCards,
@@ -18,6 +19,7 @@ import {
   deleteBook,
   ensureUser,
   exportUserData,
+  findPendingCheckoutSession,
   findPolicyAcceptance,
   findStudyCard,
   findSubscription,
@@ -25,7 +27,9 @@ import {
   latestReview,
   listBooks,
   recordPolicyAcceptance,
-  saveSubscription,
+  claimPendingCheckoutSession,
+  releasePendingCheckoutSession,
+  savePendingCheckoutSession,
   saveReview,
   updateBookTitle,
   updateCard,
@@ -49,39 +53,6 @@ function checkoutIntegrationIdentifier(): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz";
   const random = crypto.getRandomValues(new Uint8Array(8));
   return `tannot_checkout_${Array.from(random, (value) => alphabet[value % alphabet.length]).join("")}`;
-}
-
-function toStripeId(value: string | Stripe.Customer | Stripe.Subscription | Stripe.DeletedCustomer | null | undefined): string | null {
-  return typeof value === "string" ? value : value?.id ?? null;
-}
-
-function subscriptionPeriodEnd(subscription: Stripe.Subscription): number | null {
-  return subscription.items.data.reduce<number | null>((latest, item) => (
-    latest === null || item.current_period_end > latest ? item.current_period_end : latest
-  ), null);
-}
-
-async function syncSubscription(
-  db: D1Database,
-  input: {
-    userId: string;
-    customerId: string | null;
-    subscriptionId: string | null;
-    status: string;
-    currentPeriodEnd: number | null;
-    cancelAtPeriodEnd: boolean;
-    eventCreated: number;
-  },
-): Promise<void> {
-  await saveSubscription(db, {
-    userId: input.userId,
-    stripe_customer_id: input.customerId,
-    stripe_subscription_id: input.subscriptionId,
-    status: input.status,
-    current_period_end: input.currentPeriodEnd ? new Date(input.currentPeriodEnd * 1000).toISOString() : null,
-    cancel_at_period_end: input.cancelAtPeriodEnd ? 1 : 0,
-    last_event_created_at: input.eventCreated,
-  });
 }
 
 async function requireUser(c: AppContext) {
@@ -356,19 +327,51 @@ app.post("/api/billing/checkout", async (c) => {
     privacyVersion: PRIVACY_VERSION,
     confirmEligibility: true,
   });
-  const stripe = createStripeClient(stripeSecretKey);
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    integration_identifier: checkoutIntegrationIdentifier(),
-    line_items: [{ price: stripePriceId, quantity: 1 }],
-    ...(existingSubscription?.stripe_customer_id ? { customer: existingSubscription.stripe_customer_id } : { customer_email: user.email }),
-    client_reference_id: user.id,
-    success_url: `${appUrl}/settings?billing=success`,
-    cancel_url: `${appUrl}/settings?billing=cancelled`,
-    metadata: { userId: user.id },
-    subscription_data: { metadata: { userId: user.id }, trial_period_days: 7 },
+
+  const now = new Date();
+  const pendingSession = await findPendingCheckoutSession(c.env.DB, user.id, now.toISOString());
+  if (pendingSession?.checkout_url) return c.json({ url: pendingSession.checkout_url, reused: true });
+  if (pendingSession) return jsonError("CHECKOUT_IN_PROGRESS", "決済画面を準備しています。少し待って再度お試しください", 409);
+
+  const requestToken = crypto.randomUUID();
+  const lockExpiresAt = new Date(now.getTime() + 2 * 60 * 1000).toISOString();
+  const claimed = await claimPendingCheckoutSession(c.env.DB, {
+    userId: user.id,
+    requestToken,
+    expiresAt: lockExpiresAt,
+    now: now.toISOString(),
   });
-  return c.json({ url: session.url });
+  if (!claimed) return jsonError("CHECKOUT_IN_PROGRESS", "決済画面を準備しています。少し待って再度お試しください", 409);
+
+  const stripe = createStripeClient(stripeSecretKey);
+  const checkoutExpiresAt = Math.floor(now.getTime() / 1000) + 31 * 60;
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      integration_identifier: checkoutIntegrationIdentifier(),
+      line_items: [{ price: stripePriceId, quantity: 1 }],
+      ...(existingSubscription?.stripe_customer_id ? { customer: existingSubscription.stripe_customer_id } : { customer_email: user.email }),
+      client_reference_id: user.id,
+      success_url: `${appUrl}/settings?billing=success`,
+      cancel_url: `${appUrl}/settings?billing=cancelled`,
+      expires_at: checkoutExpiresAt,
+      metadata: { userId: user.id },
+      subscription_data: { metadata: { userId: user.id }, trial_period_days: 7 },
+    }, { idempotencyKey: `checkout:${user.id}:${requestToken}` });
+    if (!session.url) throw new Error("Stripe Checkout session did not include a URL");
+    const saved = await savePendingCheckoutSession(c.env.DB, {
+      userId: user.id,
+      requestToken,
+      sessionId: session.id,
+      checkoutUrl: session.url,
+      expiresAt: new Date(checkoutExpiresAt * 1000).toISOString(),
+    });
+    if (!saved) throw new Error("Checkout session claim was lost before it could be saved");
+    return c.json({ url: session.url, reused: false });
+  } catch (error) {
+    await releasePendingCheckoutSession(c.env.DB, user.id, requestToken);
+    throw error;
+  }
 });
 
 app.post("/api/billing/portal", async (c) => {
@@ -417,53 +420,17 @@ app.post("/api/billing/webhook", async (c) => {
   } catch {
     return jsonError("INVALID_SIGNATURE", "webhookの署名を検証できません", 400);
   }
-  const inserted = await c.env.DB.prepare("INSERT OR IGNORE INTO stripe_events (event_id) VALUES (?)").bind(event.id).run();
-  if (inserted.meta.changes === 0) return c.json({ received: true, duplicate: true });
-
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    const userId = session.metadata?.userId ?? session.client_reference_id;
-    const subscriptionId = toStripeId(session.subscription);
-    if (userId) {
-      let status = "active";
-      let currentPeriodEnd: number | null = null;
-      let cancelAtPeriodEnd = false;
-      if (subscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        if (!("deleted" in subscription && subscription.deleted)) {
-          status = subscription.status;
-          currentPeriodEnd = subscriptionPeriodEnd(subscription);
-          cancelAtPeriodEnd = subscription.cancel_at_period_end;
-        }
-      }
-      await syncSubscription(c.env.DB, {
-        userId,
-        customerId: toStripeId(session.customer),
-        subscriptionId,
-        status,
-        currentPeriodEnd,
-        cancelAtPeriodEnd,
-        eventCreated: event.created,
-      });
-    }
+  try {
+    const result = await processStripeWebhookEvent(c.env.DB, stripe.subscriptions, event);
+    return c.json({ received: true, duplicate: result.duplicate });
+  } catch (error) {
+    console.error("stripe_webhook_failed", {
+      eventId: event.id,
+      eventType: event.type,
+      message: error instanceof Error ? error.message : "unknown error",
+    });
+    throw error;
   }
-
-  if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(event.type)) {
-    const subscription = event.data.object as Stripe.Subscription;
-    const userId = subscription.metadata.userId;
-    if (userId) {
-      await syncSubscription(c.env.DB, {
-        userId,
-        customerId: toStripeId(subscription.customer),
-        subscriptionId: subscription.id,
-        status: event.type === "customer.subscription.deleted" ? "canceled" : subscription.status,
-        currentPeriodEnd: subscriptionPeriodEnd(subscription),
-        cancelAtPeriodEnd: event.type === "customer.subscription.deleted" ? false : subscription.cancel_at_period_end,
-        eventCreated: event.created,
-      });
-    }
-  }
-  return c.json({ received: true });
 });
 
 app.get("/health", (c) => c.json({ ok: true }));

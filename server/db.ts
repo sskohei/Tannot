@@ -19,6 +19,14 @@ export type Subscription = {
   last_event_created_at: number;
 };
 
+export type PendingCheckoutSession = {
+  user_id: string;
+  request_token: string;
+  stripe_session_id: string | null;
+  checkout_url: string | null;
+  expires_at: string;
+};
+
 export async function ensureUser(db: D1Database, user: User): Promise<void> {
   await db
     .prepare(
@@ -435,6 +443,70 @@ export async function saveSubscription(
   ).run();
 }
 
+export async function hasProcessedStripeEvent(db: D1Database, eventId: string): Promise<boolean> {
+  const event = await db.prepare("SELECT event_id FROM stripe_events WHERE event_id = ?").bind(eventId).first<{ event_id: string }>();
+  return event !== null;
+}
+
+export async function recordProcessedStripeEvent(db: D1Database, eventId: string): Promise<void> {
+  await db.prepare("INSERT OR IGNORE INTO stripe_events (event_id) VALUES (?)").bind(eventId).run();
+}
+
+export async function findPendingCheckoutSession(
+  db: D1Database,
+  userId: string,
+  now: string,
+): Promise<PendingCheckoutSession | null> {
+  return db.prepare(
+    `SELECT user_id, request_token, stripe_session_id, checkout_url, expires_at
+     FROM billing_checkout_sessions WHERE user_id = ? AND expires_at > ?`,
+  ).bind(userId, now).first<PendingCheckoutSession>();
+}
+
+export async function claimPendingCheckoutSession(
+  db: D1Database,
+  input: { userId: string; requestToken: string; expiresAt: string; now: string },
+): Promise<boolean> {
+  const result = await db.prepare(
+    `INSERT INTO billing_checkout_sessions (user_id, request_token, expires_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET
+       request_token = excluded.request_token,
+       stripe_session_id = NULL,
+       checkout_url = NULL,
+       expires_at = excluded.expires_at,
+       created_at = datetime('now')
+     WHERE billing_checkout_sessions.expires_at <= ?`,
+  ).bind(input.userId, input.requestToken, input.expiresAt, input.now).run();
+  return result.meta.changes > 0;
+}
+
+export async function savePendingCheckoutSession(
+  db: D1Database,
+  input: { userId: string; requestToken: string; sessionId: string; checkoutUrl: string; expiresAt: string },
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE billing_checkout_sessions
+     SET stripe_session_id = ?, checkout_url = ?, expires_at = ?
+     WHERE user_id = ? AND request_token = ?`,
+  ).bind(input.sessionId, input.checkoutUrl, input.expiresAt, input.userId, input.requestToken).run();
+  return result.meta.changes > 0;
+}
+
+export async function releasePendingCheckoutSession(
+  db: D1Database,
+  userId: string,
+  requestToken: string,
+): Promise<void> {
+  await db.prepare(
+    "DELETE FROM billing_checkout_sessions WHERE user_id = ? AND request_token = ? AND stripe_session_id IS NULL",
+  ).bind(userId, requestToken).run();
+}
+
+export async function deletePendingCheckoutSessionByStripeId(db: D1Database, stripeSessionId: string): Promise<void> {
+  await db.prepare("DELETE FROM billing_checkout_sessions WHERE stripe_session_id = ?").bind(stripeSessionId).run();
+}
+
 export async function exportUserData(db: D1Database, userId: string): Promise<Record<string, unknown>> {
   const [books, cards, reviews] = await Promise.all([
     db.prepare("SELECT id, title, created_at, updated_at FROM study_books WHERE user_id = ? ORDER BY created_at").bind(userId).all<Record<string, unknown>>(),
@@ -462,6 +534,7 @@ export async function deleteUserData(db: D1Database, userId: string): Promise<vo
     db.prepare("DELETE FROM reviews WHERE user_id = ?").bind(userId),
     db.prepare("DELETE FROM study_books WHERE user_id = ?").bind(userId),
     db.prepare("DELETE FROM subscriptions WHERE user_id = ?").bind(userId),
+    db.prepare("DELETE FROM billing_checkout_sessions WHERE user_id = ?").bind(userId),
     db.prepare("DELETE FROM session WHERE userId = ?").bind(userId),
     db.prepare("DELETE FROM account WHERE userId = ?").bind(userId),
     db.prepare("DELETE FROM users WHERE id = ?").bind(userId),

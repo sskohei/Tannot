@@ -13,7 +13,7 @@ Stripe webhookをローカルで確認する場合は別ターミナルでStripe
 
 ```bash
 stripe listen \
-  --events checkout.session.completed,checkout.session.expired,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,customer.subscription.trial_will_end,invoice.paid,invoice.payment_failed,invoice.payment_action_required,invoice.finalization_failed \
+  --events checkout.session.completed,checkout.session.expired,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,customer.subscription.paused,customer.subscription.resumed,customer.subscription.trial_will_end,invoice.paid,invoice.payment_failed,invoice.payment_action_required,invoice.finalization_failed \
   --forward-to http://localhost:3000/api/billing/webhook
 ```
 
@@ -28,7 +28,7 @@ stripe listen \
 - Web Speech APIは端末・OS・ブラウザの音声合成エンジンを利用するため、音声サービス用のWorker secretは不要とする。
 - 本番リソースのdatabase_idとremote migration手順は [`docs/production.md`](./production.md) を確認する。
 - デプロイ後にログイン、単語帳作成、音声再生、レビュー保存、Checkout、webhook を確認する。
-- webhook は再送される前提で、`stripe_events` による冪等性を確認する。
+- webhook は再送される前提で、処理成功後だけ `stripe_events` に記録され、処理失敗時の再送で回復できることを確認する。
 - Stripe Dashboardの動的決済手段でカード、Apple Pay、Google Payを有効化し、本番・ステージングそれぞれのHTTPSドメインをPayment method domainsとして登録する。Customer Portalでは、支払い方法の更新、請求書の閲覧、期間末での解約を有効化する。
 
 ## 必須情報の例

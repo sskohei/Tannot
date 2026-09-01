@@ -49,15 +49,20 @@ npm run build
 - 次のイベントを本番webhook endpointへ送信する。
   - `checkout.session.completed`
   - `checkout.session.expired`
+  - `checkout.session.async_payment_succeeded`
+  - `checkout.session.async_payment_failed`
   - `customer.subscription.created`
   - `customer.subscription.updated`
   - `customer.subscription.deleted`
+  - `customer.subscription.paused`
+  - `customer.subscription.resumed`
   - `customer.subscription.trial_will_end`
   - `invoice.paid`
   - `invoice.payment_failed`
   - `invoice.payment_action_required`
   - `invoice.finalization_failed`
 - 料金、利用規約、プライバシーポリシー、特定商取引法に基づく表記を公開状態で確認する。
+- 規約上の「次回更新日時の24時間前まで」という解約期限を運用で保証するか、Stripe Customer Portalの実際の解約可能時刻に合わせて表示・規約を変更するかを、公開前に法務確認して統一する。
 - Stripeの顧客メールで支払い成功時の領収書と支払い失敗通知を有効にする。
 - 正式リリース前は [`release-checklist.md`](./release-checklist.md) の実機、アクセシビリティ、法務・サポート確認を完了する。
 
