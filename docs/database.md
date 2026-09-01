@@ -11,6 +11,7 @@ Cloudflare D1 は SQLite のため、スキーマ変更は `wrangler d1 migratio
 | reviews | id, card_id, user_id, rating, reviewed_at, due_at, interval_days, repetitions, fsrs_state, fsrs_stability, fsrs_difficulty, fsrs_elapsed_days, fsrs_learning_steps, fsrs_lapses | 学習履歴とFSRS状態。`ease_factor` は旧アルゴリズム互換用 |
 | subscriptions | user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, cancel_at_period_end, last_event_created_at | 課金状態とwebhookの順序管理 |
 | stripe_events | event_id, received_at | webhook の冪等性 |
+| billing_checkout_sessions | user_id, request_token, stripe_session_id, checkout_url, expires_at | Checkout作成ロックと未完了セッションURLの再利用 |
 
 ## 辞書・例文データ
 
@@ -35,6 +36,8 @@ EJDict と Tatoeba の生データをリクエスト時に読み込まず、EJCS
 - `study_books.user_id` と `reviews.user_id` は所有ユーザーを表す。
 - カード削除時のレビュー削除は外部キーまたは明示的なトランザクションで保証する。
 - レビュー送信には `request_id` またはクライアント側イベント ID を持たせ、二重送信を冪等に処理する。
+- Stripe webhookイベントは処理成功後にだけ `stripe_events` へ記録し、失敗した処理を再送で回復できるようにする。
+- Checkout作成は利用者単位の一時ロックとStripeのidempotency keyを併用し、有効期限内の未完了セッションを再利用する。
 - 時刻は ISO 8601 または Unix epoch のどちらかに統一し、プロジェクト開始時に決定する。
 
 ## アカウントデータ

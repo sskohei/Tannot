@@ -41,7 +41,9 @@
 
 `PATCH /api/books/:bookId` は `{ "title": "変更後の名前" }`、`PATCH /api/books/:bookId/cards/:cardId` は `{ "term": "run", "translation": "走る", "sentence": "I run." }` を受け取ります。カードを編集すると、辞書・例文データと利用者の編集内容を混同しないため、保存済みの例文出典情報を外します。
 
-`POST /api/billing/checkout` は `{ "termsAccepted": true, "eligibilityAccepted": true }` を受け取り、利用規約・プライバシーポリシーの版と同意日時、13歳以上かつ未成年の場合の保護者同意確認を保存したうえで、7日間の無料トライアル付き月額プランのStripe Checkoutを作成します。決済手段はコードで固定せず、Stripe Dashboardの動的決済手段でカード、Apple Pay、Google Payを有効にします。`POST /api/billing/portal` は、支払い方法、請求書および解約を利用者自身で管理するためのCustomer Portalを返します。
+`POST /api/billing/checkout` は `{ "termsAccepted": true, "eligibilityAccepted": true }` を受け取り、利用規約・プライバシーポリシーの版と同意日時、13歳以上かつ未成年の場合の保護者同意確認を保存したうえで、7日間の無料トライアル付き月額プランのStripe Checkoutを作成します。同じ利用者に有効な未完了セッションがある場合はそのURLを再利用し、連打や通信再送による重複セッション作成を防ぎます。決済手段はコードで固定せず、Stripe Dashboardの動的決済手段でカード、Apple Pay、Google Payを有効にします。`POST /api/billing/portal` は、支払い方法、請求書および解約を利用者自身で管理するためのCustomer Portalを返します。
+
+`POST /api/billing/webhook` は署名検証後、Checkout完了・期限切れ・非同期決済結果、サブスクリプションの作成・更新・停止・再開・削除・トライアル終了予告、請求の成功・失敗・追加認証・確定失敗を処理します。契約状態は必要に応じてStripeから最新値を再取得して同期します。イベントIDは処理成功後だけ保存するため、一時障害で5xxになったイベントはStripeの再送で再処理されます。
 
 ## エラー形式
 
