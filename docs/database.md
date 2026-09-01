@@ -5,7 +5,7 @@ Cloudflare D1 は SQLite のため、スキーマ変更は `wrangler d1 migratio
 | テーブル | 主なカラム | 目的 |
 | --- | --- | --- |
 | user / account / session / verification | Better Auth標準カラム | Google OAuthとセッション |
-| users | id, email, name, created_at, terms_accepted_at, privacy_accepted_at | アプリケーション側のユーザー参照とプレミアム購入時の同意記録 |
+| users | id, email, name, created_at, terms_accepted_at, privacy_accepted_at, terms_version, privacy_version, eligibility_confirmed_at | アプリケーション側のユーザー参照とプレミアム購入時の規約版・年齢等の確認記録 |
 | study_books | id, user_id, title, created_at, updated_at | 単語帳 |
 | cards | id, book_id, term, normalized_term, translation, sentence, sentence_source_id | 単語カードのスナップショットと出典。音声は保存しない |
 | reviews | id, card_id, user_id, rating, reviewed_at, due_at, interval_days, repetitions, fsrs_state, fsrs_stability, fsrs_difficulty, fsrs_elapsed_days, fsrs_learning_steps, fsrs_lapses | 学習履歴とFSRS状態。`ease_factor` は旧アルゴリズム互換用 |

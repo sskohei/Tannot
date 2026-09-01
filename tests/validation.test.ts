@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeTerm, parseTerms, parseTitle, ValidationError } from "@/lib/validation";
+import { normalizeTerm, parseCardCopy, parseCardTerm, parseTerms, parseTitle, ValidationError } from "@/lib/validation";
 
 describe("input validation", () => {
   it("normalizes whitespace and removes duplicate terms", () => {
@@ -15,5 +15,13 @@ describe("input validation", () => {
   it("validates book titles", () => {
     expect(parseTitle("  Travel English ")).toBe("Travel English");
     expect(() => parseTitle("")).toThrow(ValidationError);
+  });
+
+  it("validates editable card fields", () => {
+    expect(parseCardTerm("  look   forward to ")).toBe("look forward to");
+    expect(parseCardCopy("  〜を楽しみにする  ", "日本語訳")).toBe("〜を楽しみにする");
+    expect(parseCardCopy("", "例文")).toBeNull();
+    expect(() => parseCardTerm(" ")).toThrow(ValidationError);
+    expect(() => parseCardCopy("x".repeat(2001), "例文")).toThrow(ValidationError);
   });
 });

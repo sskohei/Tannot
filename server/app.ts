@@ -3,19 +3,22 @@ import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import Stripe from "stripe";
 import { isPremiumStatus, isWithinFreeCardLimit } from "@/lib/billing";
+import { PRIVACY_VERSION, TERMS_VERSION } from "@/lib/policies";
 import { calculateReview } from "@/lib/review";
-import { normalizeTerm, parseRating, parseRequestId, parseTerms, parseTitle } from "@/lib/validation";
+import { normalizeTerm, parseCardCopy, parseCardTerm, parseRating, parseRequestId, parseTerms, parseTitle } from "@/lib/validation";
 import type { Bindings } from "@/lib/types";
-import { createAuth } from "@/server/auth";
+import { createAuth, getEnvValue } from "@/server/auth";
 import { findLookupResults } from "@/server/lookup-data";
 import {
   addCards,
   countUserBooks,
   createBook,
+  deleteCard,
   deleteUserData,
   deleteBook,
   ensureUser,
   exportUserData,
+  findPolicyAcceptance,
   findStudyCard,
   findSubscription,
   getBook,
@@ -24,6 +27,8 @@ import {
   recordPolicyAcceptance,
   saveSubscription,
   saveReview,
+  updateBookTitle,
+  updateCard,
 } from "@/server/db";
 import { jsonError, toErrorResponse } from "@/server/errors";
 
@@ -35,6 +40,16 @@ app.onError((error) => toErrorResponse(error));
 app.all("/api/auth/*", (c) => createAuth(c.env).handler(c.req.raw));
 
 type AppContext = Context<{ Bindings: Bindings; Variables: Variables }>;
+
+function createStripeClient(secretKey: string): Stripe {
+  return new Stripe(secretKey, { apiVersion: "2026-07-29.dahlia" });
+}
+
+function checkoutIntegrationIdentifier(): string {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz";
+  const random = crypto.getRandomValues(new Uint8Array(8));
+  return `tannot_checkout_${Array.from(random, (value) => alphabet[value % alphabet.length]).join("")}`;
+}
 
 function toStripeId(value: string | Stripe.Customer | Stripe.Subscription | Stripe.DeletedCustomer | null | undefined): string | null {
   return typeof value === "string" ? value : value?.id ?? null;
@@ -87,8 +102,31 @@ app.get("/api/me", async (c) => {
   await ensureUser(c.env.DB, user);
   const bookCount = await countUserBooks(c.env.DB, user.id);
   const subscription = await findSubscription(c.env.DB, user.id);
+  const policyAcceptance = await findPolicyAcceptance(c.env.DB, user.id);
   const limit = Number(c.env.FREE_BOOK_LIMIT ?? 3);
-  return c.json({ user, usage: { books: bookCount, freeBookLimit: limit }, subscription });
+  return c.json({
+    user,
+    usage: { books: bookCount, freeBookLimit: limit },
+    subscription,
+    policyAcceptance,
+    currentPolicies: { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION },
+  });
+});
+
+app.post("/api/account/consent", async (c) => {
+  const user = await requireUser(c);
+  const body = await c.req.json<{ termsAccepted?: unknown; eligibilityAccepted?: unknown }>()
+    .catch((): { termsAccepted?: unknown; eligibilityAccepted?: unknown } => ({}));
+  if (body.termsAccepted !== true) return jsonError("TERMS_REQUIRED", "利用規約とプライバシーポリシーへの同意が必要です", 400);
+  if (body.eligibilityAccepted !== true) {
+    return jsonError("ELIGIBILITY_REQUIRED", "13歳以上であることと、未成年の場合は保護者の同意が必要です", 400);
+  }
+  await recordPolicyAcceptance(c.env.DB, user.id, {
+    termsVersion: TERMS_VERSION,
+    privacyVersion: PRIVACY_VERSION,
+    confirmEligibility: true,
+  });
+  return c.json({ accepted: true, termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION });
 });
 
 app.post("/api/books/preview", async (c) => {
@@ -149,6 +187,16 @@ app.post("/api/books", async (c) => {
 app.get("/api/books", async (c) => {
   const user = await requireUser(c);
   return c.json({ books: await listBooks(c.env.DB, user.id) });
+});
+
+app.get("/api/study/summary", async (c) => {
+  const user = await requireUser(c);
+  const books = await listBooks(c.env.DB, user.id);
+  return c.json({
+    totalDue: books.reduce((total, book) => total + Number(book.due_count), 0),
+    totalCards: books.reduce((total, book) => total + Number(book.card_count), 0),
+    books,
+  });
 });
 
 app.post("/api/books/:bookId/cards", async (c) => {
@@ -216,6 +264,36 @@ app.get("/api/books/:bookId", async (c) => {
   return c.json({ book });
 });
 
+app.patch("/api/books/:bookId", async (c) => {
+  const user = await requireUser(c);
+  const body = await c.req.json<{ title?: unknown }>();
+  const book = await updateBookTitle(c.env.DB, user.id, c.req.param("bookId"), parseTitle(body.title));
+  if (!book) return jsonError("NOT_FOUND", "単語帳が見つかりません", 404);
+  return c.json({ book });
+});
+
+app.patch("/api/books/:bookId/cards/:cardId", async (c) => {
+  const user = await requireUser(c);
+  const body = await c.req.json<{ term?: unknown; translation?: unknown; sentence?: unknown }>();
+  const term = parseCardTerm(body.term);
+  const updated = await updateCard(c.env.DB, user.id, c.req.param("bookId"), c.req.param("cardId"), {
+    term,
+    normalizedTerm: normalizeTerm(term),
+    translation: parseCardCopy(body.translation, "日本語訳"),
+    sentence: parseCardCopy(body.sentence, "例文"),
+  });
+  if (updated.duplicate) return jsonError("DUPLICATE_TERM", "同じ単語がこの単語帳に登録されています", 409);
+  if (!updated.card) return jsonError("NOT_FOUND", "学習カードが見つかりません", 404);
+  return c.json({ card: updated.card });
+});
+
+app.delete("/api/books/:bookId/cards/:cardId", async (c) => {
+  const user = await requireUser(c);
+  const deleted = await deleteCard(c.env.DB, user.id, c.req.param("bookId"), c.req.param("cardId"));
+  if (!deleted) return jsonError("NOT_FOUND", "学習カードが見つかりません", 404);
+  return c.body(null, 204);
+});
+
 app.delete("/api/books/:bookId", async (c) => {
   const user = await requireUser(c);
   const deleted = await deleteBook(c.env.DB, user.id, c.req.param("bookId"));
@@ -261,21 +339,32 @@ app.post("/api/study/reviews", async (c) => {
 
 app.post("/api/billing/checkout", async (c) => {
   const user = await requireUser(c);
-  if (!c.env.STRIPE_SECRET_KEY || !c.env.STRIPE_PRICE_ID) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
-  const body = await c.req.json<{ termsAccepted?: unknown }>().catch((): { termsAccepted?: unknown } => ({}));
+  const stripeSecretKey = getEnvValue(c.env, "STRIPE_SECRET_KEY");
+  const stripePriceId = getEnvValue(c.env, "STRIPE_PRICE_ID");
+  const appUrl = getEnvValue(c.env, "BETTER_AUTH_URL");
+  if (!stripeSecretKey || !stripePriceId || !appUrl) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
+  const body = await c.req.json<{ termsAccepted?: unknown; eligibilityAccepted?: unknown }>()
+    .catch((): { termsAccepted?: unknown; eligibilityAccepted?: unknown } => ({}));
   if (body.termsAccepted !== true) return jsonError("TERMS_REQUIRED", "利用規約とプライバシーポリシーへの同意が必要です", 400);
+  if (body.eligibilityAccepted !== true) {
+    return jsonError("ELIGIBILITY_REQUIRED", "13歳以上であることと、未成年の場合は保護者の同意が必要です", 400);
+  }
   const existingSubscription = await findSubscription(c.env.DB, user.id);
   if (isPremiumStatus(existingSubscription?.status)) return jsonError("ALREADY_SUBSCRIBED", "すでにプレミアムプランをご利用中です", 409);
-  await recordPolicyAcceptance(c.env.DB, user.id);
-  const stripe = new Stripe(c.env.STRIPE_SECRET_KEY);
+  await recordPolicyAcceptance(c.env.DB, user.id, {
+    termsVersion: TERMS_VERSION,
+    privacyVersion: PRIVACY_VERSION,
+    confirmEligibility: true,
+  });
+  const stripe = createStripeClient(stripeSecretKey);
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
-    line_items: [{ price: c.env.STRIPE_PRICE_ID, quantity: 1 }],
-    payment_method_types: ["card"],
+    integration_identifier: checkoutIntegrationIdentifier(),
+    line_items: [{ price: stripePriceId, quantity: 1 }],
     ...(existingSubscription?.stripe_customer_id ? { customer: existingSubscription.stripe_customer_id } : { customer_email: user.email }),
     client_reference_id: user.id,
-    success_url: `${c.env.BETTER_AUTH_URL}/settings?billing=success`,
-    cancel_url: `${c.env.BETTER_AUTH_URL}/settings?billing=cancelled`,
+    success_url: `${appUrl}/settings?billing=success`,
+    cancel_url: `${appUrl}/settings?billing=cancelled`,
     metadata: { userId: user.id },
     subscription_data: { metadata: { userId: user.id }, trial_period_days: 7 },
   });
@@ -284,13 +373,15 @@ app.post("/api/billing/checkout", async (c) => {
 
 app.post("/api/billing/portal", async (c) => {
   const user = await requireUser(c);
-  if (!c.env.STRIPE_SECRET_KEY) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
+  const stripeSecretKey = getEnvValue(c.env, "STRIPE_SECRET_KEY");
+  const appUrl = getEnvValue(c.env, "BETTER_AUTH_URL");
+  if (!stripeSecretKey || !appUrl) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
   const subscription = await findSubscription(c.env.DB, user.id);
   if (!subscription?.stripe_customer_id) return jsonError("BILLING_NOT_FOUND", "管理できる契約がありません", 404);
-  const stripe = new Stripe(c.env.STRIPE_SECRET_KEY);
+  const stripe = createStripeClient(stripeSecretKey);
   const session = await stripe.billingPortal.sessions.create({
     customer: subscription.stripe_customer_id,
-    return_url: `${c.env.BETTER_AUTH_URL}/settings`,
+    return_url: `${appUrl}/settings`,
   });
   return c.json({ url: session.url });
 });
@@ -313,14 +404,16 @@ app.delete("/api/account", async (c) => {
 });
 
 app.post("/api/billing/webhook", async (c) => {
-  if (!c.env.STRIPE_SECRET_KEY || !c.env.STRIPE_WEBHOOK_SECRET) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
+  const stripeSecretKey = getEnvValue(c.env, "STRIPE_SECRET_KEY");
+  const stripeWebhookSecret = getEnvValue(c.env, "STRIPE_WEBHOOK_SECRET");
+  if (!stripeSecretKey || !stripeWebhookSecret) return jsonError("BILLING_NOT_CONFIGURED", "決済機能はまだ設定されていません", 503);
   const signature = c.req.header("stripe-signature");
   if (!signature) return jsonError("INVALID_SIGNATURE", "署名がありません", 400);
   const rawBody = await c.req.text();
-  const stripe = new Stripe(c.env.STRIPE_SECRET_KEY);
+  const stripe = createStripeClient(stripeSecretKey);
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, signature, c.env.STRIPE_WEBHOOK_SECRET);
+    event = stripe.webhooks.constructEvent(rawBody, signature, stripeWebhookSecret);
   } catch {
     return jsonError("INVALID_SIGNATURE", "webhookの署名を検証できません", 400);
   }

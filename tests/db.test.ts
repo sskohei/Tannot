@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addCards, findStudyCard } from "@/server/db";
+import { addCards, findStudyCard, recordPolicyAcceptance } from "@/server/db";
 
 const book = {
   id: "book-1",
@@ -64,6 +64,34 @@ describe("study book cards", () => {
     ]);
 
     await expect(findStudyCard(db, "user-1", "book-1", false)).resolves.toBeNull();
+  });
+});
+
+describe("policy acceptance", () => {
+  it("stores the accepted policy versions and eligibility timestamp together", async () => {
+    const boundValues: unknown[][] = [];
+    const db = {
+      prepare() {
+        return {
+          bind(...values: unknown[]) {
+            boundValues.push(values);
+            return { run: async () => ({ meta: { changes: 1 } }) };
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    await recordPolicyAcceptance(db, "user-1", {
+      termsVersion: "2026-08-21",
+      privacyVersion: "2026-08-21",
+      confirmEligibility: true,
+    });
+
+    expect(boundValues).toHaveLength(1);
+    expect(boundValues[0][2]).toBe("2026-08-21");
+    expect(boundValues[0][3]).toBe("2026-08-21");
+    expect(boundValues[0][4]).toBe(1);
+    expect(boundValues[0][6]).toBe("user-1");
   });
 });
 

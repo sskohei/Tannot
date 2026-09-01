@@ -2,6 +2,7 @@ const MAX_TERM_LENGTH = 100;
 const MAX_TITLE_LENGTH = 100;
 const MAX_INPUT_LENGTH = 10_000;
 const MAX_TERMS = 100;
+const MAX_CARD_COPY_LENGTH = 2_000;
 
 export class ValidationError extends Error {
   readonly code = "VALIDATION_ERROR";
@@ -45,6 +46,25 @@ export function parseTitle(title: unknown): string {
     throw new ValidationError("単語帳名は1〜100文字で入力してください");
   }
   return value;
+}
+
+export function parseCardTerm(term: unknown): string {
+  if (typeof term !== "string") throw new ValidationError("英単語・熟語を入力してください");
+  const value = term.trim().replace(/\s+/g, " ");
+  if (value.length === 0 || value.length > MAX_TERM_LENGTH) {
+    throw new ValidationError(`英単語・熟語は1〜${MAX_TERM_LENGTH}文字で入力してください`);
+  }
+  return value;
+}
+
+export function parseCardCopy(value: unknown, label: string): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") throw new ValidationError(`${label}を確認してください`);
+  const normalized = value.trim();
+  if (normalized.length > MAX_CARD_COPY_LENGTH) {
+    throw new ValidationError(`${label}は${MAX_CARD_COPY_LENGTH}文字以内で入力してください`);
+  }
+  return normalized || null;
 }
 
 export function parseRating(value: unknown): "again" | "hard" | "good" | "easy" {

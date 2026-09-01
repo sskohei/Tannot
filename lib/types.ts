@@ -37,6 +37,11 @@ export type StudyBook = {
   updated_at: string;
 };
 
+export type StudyBookSummary = StudyBook & {
+  card_count: number;
+  due_count: number;
+};
+
 export type ReviewState = {
   rating: Rating;
   state: number;

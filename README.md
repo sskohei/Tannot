@@ -28,7 +28,7 @@
 
 ## 開発を始める
 
-現時点では設計文書を先に整備した段階です。アプリ本体が追加された後は、プロジェクトの `package.json` に定義されたコマンドを使用してください。環境変数の名前とローカル起動手順は [`docs/setup.md`](./docs/setup.md) に集約します。
+Node.js 22以上を用意し、`npm ci`、ローカルD1のマイグレーション、`npm run dev`の順で起動します。環境変数と詳しい手順は [`docs/setup.md`](./docs/setup.md) を参照してください。コミット前は`npm run lint`、`npm run typecheck`、`npm test`、`npm run build`を実行します。
 
 ## 文書
 
@@ -40,6 +40,7 @@
 - [`docs/data-and-licenses.md`](./docs/data-and-licenses.md): データ出典・帰属・配布時の注意
 - [`docs/setup.md`](./docs/setup.md): 開発・デプロイ・秘密情報の管理
 - [`docs/production.md`](./docs/production.md): 本番Cloudflareリソースとデプロイ前チェック
+- [`docs/release-checklist.md`](./docs/release-checklist.md): 正式リリース前の実機・決済・法務確認
 
 ## ライセンス・データ表示
 

@@ -1,4 +1,4 @@
-import type { Card, DictionaryResult, StudyBook } from "@/lib/types";
+import type { Card, DictionaryResult, StudyBook, StudyBookSummary } from "@/lib/types";
 import { getReviewIntervals, type StoredReviewState } from "@/lib/review";
 
 type CardInput = {
@@ -29,11 +29,38 @@ export async function ensureUser(db: D1Database, user: User): Promise<void> {
     .run();
 }
 
-export async function recordPolicyAcceptance(db: D1Database, userId: string): Promise<void> {
+export async function recordPolicyAcceptance(
+  db: D1Database,
+  userId: string,
+  input: { termsVersion: string; privacyVersion: string; confirmEligibility: boolean },
+): Promise<void> {
   const acceptedAt = new Date().toISOString();
   await db.prepare(
-    "UPDATE users SET terms_accepted_at = ?, privacy_accepted_at = ? WHERE id = ?",
-  ).bind(acceptedAt, acceptedAt, userId).run();
+    `UPDATE users
+     SET terms_accepted_at = ?, privacy_accepted_at = ?, terms_version = ?, privacy_version = ?,
+         eligibility_confirmed_at = CASE WHEN ? THEN ? ELSE eligibility_confirmed_at END
+     WHERE id = ?`,
+  ).bind(
+    acceptedAt,
+    acceptedAt,
+    input.termsVersion,
+    input.privacyVersion,
+    input.confirmEligibility ? 1 : 0,
+    acceptedAt,
+    userId,
+  ).run();
+}
+
+export type PolicyAcceptance = {
+  terms_version: string | null;
+  privacy_version: string | null;
+  eligibility_confirmed_at: string | null;
+};
+
+export async function findPolicyAcceptance(db: D1Database, userId: string): Promise<PolicyAcceptance | null> {
+  return db.prepare(
+    "SELECT terms_version, privacy_version, eligibility_confirmed_at FROM users WHERE id = ?",
+  ).bind(userId).first<PolicyAcceptance>();
 }
 
 export async function countUserBooks(db: D1Database, userId: string): Promise<number> {
@@ -140,8 +167,22 @@ export async function addCards(
   };
 }
 
-export async function listBooks(db: D1Database, userId: string): Promise<StudyBook[]> {
-  const result = await db.prepare("SELECT * FROM study_books WHERE user_id = ? ORDER BY created_at DESC").bind(userId).all<StudyBook>();
+export async function listBooks(db: D1Database, userId: string): Promise<StudyBookSummary[]> {
+  const now = new Date().toISOString();
+  const result = await db.prepare(
+    `SELECT b.*,
+            (SELECT COUNT(*) FROM cards c WHERE c.book_id = b.id) AS card_count,
+            (SELECT COUNT(*)
+             FROM cards c
+             WHERE c.book_id = b.id
+               AND (
+                 NOT EXISTS (SELECT 1 FROM reviews r WHERE r.card_id = c.id)
+                 OR (SELECT r.due_at FROM reviews r WHERE r.card_id = c.id ORDER BY r.reviewed_at DESC LIMIT 1) <= ?
+               )) AS due_count
+     FROM study_books b
+     WHERE b.user_id = ?
+     ORDER BY b.updated_at DESC`,
+  ).bind(now, userId).all<StudyBookSummary>();
   return result.results;
 }
 
@@ -155,6 +196,64 @@ export async function getBook(db: D1Database, userId: string, bookId: string): P
 export async function deleteBook(db: D1Database, userId: string, bookId: string): Promise<boolean> {
   const result = await db.prepare("DELETE FROM study_books WHERE id = ? AND user_id = ?").bind(bookId, userId).run();
   return result.meta.changes > 0;
+}
+
+export async function updateBookTitle(db: D1Database, userId: string, bookId: string, title: string): Promise<StudyBook | null> {
+  const now = new Date().toISOString();
+  const updated = await db.prepare(
+    "UPDATE study_books SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+  ).bind(title, now, bookId, userId).run();
+  if (updated.meta.changes === 0) return null;
+  return db.prepare("SELECT * FROM study_books WHERE id = ? AND user_id = ?").bind(bookId, userId).first<StudyBook>();
+}
+
+export async function updateCard(
+  db: D1Database,
+  userId: string,
+  bookId: string,
+  cardId: string,
+  input: { term: string; normalizedTerm: string; translation: string | null; sentence: string | null },
+): Promise<{ card: Card | null; duplicate: boolean }> {
+  const ownedCard = await db.prepare(
+    `SELECT c.id FROM cards c
+     JOIN study_books b ON b.id = c.book_id
+     WHERE c.id = ? AND c.book_id = ? AND b.user_id = ?`,
+  ).bind(cardId, bookId, userId).first<{ id: string }>();
+  if (!ownedCard) return { card: null, duplicate: false };
+
+  const duplicate = await db.prepare(
+    "SELECT id FROM cards WHERE book_id = ? AND normalized_term = ? AND id <> ?",
+  ).bind(bookId, input.normalizedTerm, cardId).first<{ id: string }>();
+  if (duplicate) return { card: null, duplicate: true };
+
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare(
+      `UPDATE cards
+       SET term = ?, normalized_term = ?, translation = ?, sentence = ?,
+           sentence_source_id = NULL, sentence_author = NULL, sentence_source_url = NULL,
+           error_code = NULL, error_message = NULL
+       WHERE id = ? AND book_id = ?`,
+    ).bind(input.term, input.normalizedTerm, input.translation, input.sentence, cardId, bookId),
+    db.prepare("UPDATE study_books SET updated_at = ? WHERE id = ? AND user_id = ?").bind(now, bookId, userId),
+  ]);
+  return {
+    card: await db.prepare("SELECT * FROM cards WHERE id = ? AND book_id = ?").bind(cardId, bookId).first<Card>(),
+    duplicate: false,
+  };
+}
+
+export async function deleteCard(db: D1Database, userId: string, bookId: string, cardId: string): Promise<boolean> {
+  const deleted = await db.prepare(
+    `DELETE FROM cards
+     WHERE id = ? AND book_id = ?
+       AND EXISTS (SELECT 1 FROM study_books b WHERE b.id = cards.book_id AND b.user_id = ?)`,
+  ).bind(cardId, bookId, userId).run();
+  if (deleted.meta.changes === 0) return false;
+  await db.prepare("UPDATE study_books SET updated_at = ? WHERE id = ? AND user_id = ?")
+    .bind(new Date().toISOString(), bookId, userId)
+    .run();
+  return true;
 }
 
 export async function findStudyCard(db: D1Database, userId: string, bookId: string, reveal: boolean): Promise<Record<string, unknown> | null> {
