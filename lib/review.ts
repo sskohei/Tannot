@@ -11,7 +11,9 @@ const ratings = ["again", "hard", "good", "easy"] as const;
 const scheduler = fsrs({
   // Keep the current product's one-year cap while using FSRS scheduling.
   maximum_interval: 365,
-  request_retention: 0.9,
+  // A higher target retention keeps consecutive "easy" reviews from
+  // jumping too far apart while still letting FSRS adapt per card.
+  request_retention: 0.95,
   // Fuzz is useful in production, but deterministic previews and tests are more
   // useful until the app has its own scheduling history and settings UI.
   enable_fuzz: false,
