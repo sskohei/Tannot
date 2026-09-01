@@ -29,6 +29,8 @@
 
 `POST /api/study/reviews` の入力は `{ "cardId": "...", "rating": "again|hard|good|easy", "requestId": "..." }` です。評価結果はFSRSで次回日時を計算し、`requestId` は再送時にも同じ値を使ってレビューの二重適用を防ぎます。
 
+復習アルゴリズムは無料・プレミアムで共通です。現在のFSRS設定は目標想起率95%、最大間隔365日、ファジングなし、短期学習・再学習ステップ10分です。
+
 `POST /api/books` の入力は `{ "title": "...", "input": "run\\ngive up" }` です。入力は最大100件、1項目100文字、全体10,000文字に制限します。空行・重複は正規化して除外します。
 
 `POST /api/books/preview` は同じ入力形式で、保存せずに日本語訳・例文を返します。確認後に `POST /api/books` を呼び出して単語帳を作成します。
