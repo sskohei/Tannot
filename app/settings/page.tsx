@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { PremiumLearningSettings } from "@/components/PremiumLearning";
 
 type Subscription = {
   status: string;
@@ -127,6 +128,16 @@ export default function SettingsPage() {
     }
   }
 
+  async function downloadCsv() {
+    setLoading(true); setMessage(null);
+    try {
+      const response = await fetch("/api/account/export.csv");
+      if (!response.ok) throw new Error("CSVを出力できません");
+      const url = URL.createObjectURL(await response.blob()); const link = document.createElement("a"); link.href = url; link.download = "tannot-cards.csv"; link.click(); URL.revokeObjectURL(url);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "CSVを出力できません"); }
+    finally { setLoading(false); }
+  }
+
   async function deleteAccount() {
     if (!window.confirm("単語帳・カード・学習履歴を削除します。この操作は取り消せません。")) return;
     setLoading(true);
@@ -168,10 +179,11 @@ export default function SettingsPage() {
       {me.policyAcceptance?.terms_version && <p className="form-note">同意済み規約版：{me.policyAcceptance.terms_version}／プライバシーポリシー版：{me.policyAcceptance.privacy_version ?? "未記録"}</p>}
       <p className="form-note">プレミアムは月額500円（税込）です。7日間の無料トライアル後、初回課金日と同じ日付に毎月自動更新されます。カード、Apple Pay、Google Payに対応しています。</p>
     </section>
+    {premium && <PremiumLearningSettings />}
     <section className="panel stack">
       <h2>データ管理</h2>
-      <p className="muted">単語帳、カード、学習履歴をJSON形式でダウンロードできます。</p>
-      <div className="actions"><button className="button secondary" onClick={() => void downloadData()} disabled={loading}>データをダウンロード</button></div>
+      <p className="muted">単語帳、カード、学習履歴をJSON形式で、カードをCSV形式でダウンロードできます。</p>
+      <div className="actions"><button className="button secondary" onClick={() => void downloadData()} disabled={loading}>JSONをダウンロード</button><button className="button secondary" onClick={() => void downloadCsv()} disabled={loading}>CSVをダウンロード</button></div>
     </section>
     <section className="panel stack danger-panel">
       <h2>アカウント削除</h2>
