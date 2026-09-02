@@ -6,12 +6,15 @@ Cloudflare D1 は SQLite のため、スキーマ変更は `wrangler d1 migratio
 | --- | --- | --- |
 | user / account / session / verification | Better Auth標準カラム | Google OAuthとセッション |
 | users | id, email, name, created_at, terms_accepted_at, privacy_accepted_at, terms_version, privacy_version, eligibility_confirmed_at | アプリケーション側のユーザー参照とプレミアム購入時の規約版・年齢等の確認記録 |
-| study_books | id, user_id, title, created_at, updated_at | 単語帳 |
+| study_books | id, user_id, title, folder_name, sort_order, created_at, updated_at | 単語帳、フォルダと利用者指定の並び順 |
 | cards | id, book_id, term, normalized_term, translation, sentence, sentence_source_id | 単語カードのスナップショットと出典。音声は保存しない |
+| tags / card_tags | id, user_id, name / card_id, tag_id | 利用者ごとのカードタグと関連付け |
 | reviews | id, card_id, user_id, rating, reviewed_at, due_at, interval_days, repetitions, fsrs_state, fsrs_stability, fsrs_difficulty, fsrs_elapsed_days, fsrs_learning_steps, fsrs_lapses | 学習履歴とFSRS状態。`ease_factor` は旧アルゴリズム互換用 |
 | subscriptions | user_id, stripe_customer_id, stripe_subscription_id, status, current_period_end, cancel_at_period_end, last_event_created_at | 課金状態とwebhookの順序管理 |
 | stripe_events | event_id, received_at | webhook の冪等性 |
 | billing_checkout_sessions | user_id, request_token, stripe_session_id, checkout_url, expires_at | Checkout作成ロックと未完了セッションURLの再利用 |
+| learning_preferences | user_id, daily_review_limit, daily_new_card_limit, review_order | プレミアム利用者の出題順と1日上限 |
+| reminder_preferences | user_id, enabled, reminder_time | プレミアム利用者のブラウザ通知時刻 |
 
 ## 辞書・例文データ
 

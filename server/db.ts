@@ -1,10 +1,11 @@
 import type { Card, DictionaryResult, StudyBook, StudyBookSummary } from "@/lib/types";
 import { getReviewIntervals, type StoredReviewState } from "@/lib/review";
 
-type CardInput = {
+export type CardInput = {
   term: string;
   normalizedTerm: string;
   result: DictionaryResult;
+  tags?: string[];
 };
 
 type User = { id: string; email: string; name: string };
@@ -26,6 +27,22 @@ export type PendingCheckoutSession = {
   checkout_url: string | null;
   expires_at: string;
 };
+
+export type LearningPreferences = { daily_review_limit: number; daily_new_card_limit: number; review_order: "new_first" | "due_first" };
+export type ReminderPreferences = { enabled: number; reminder_time: string };
+
+async function replaceCardTags(db: D1Database, userId: string, cardId: string, tags: string[]): Promise<void> {
+  const statements: D1PreparedStatement[] = [db.prepare("DELETE FROM card_tags WHERE card_id = ?").bind(cardId)];
+  for (const name of tags) {
+    const tagId = crypto.randomUUID();
+    statements.push(db.prepare("INSERT INTO tags (id, user_id, name) VALUES (?, ?, ?) ON CONFLICT(user_id, name) DO NOTHING").bind(tagId, userId, name));
+    statements.push(db.prepare(
+      `INSERT OR IGNORE INTO card_tags (card_id, tag_id)
+       SELECT ?, id FROM tags WHERE user_id = ? AND name = ?`,
+    ).bind(cardId, userId, name));
+  }
+  await db.batch(statements);
+}
 
 export async function ensureUser(db: D1Database, user: User): Promise<void> {
   await db
@@ -84,9 +101,12 @@ export async function createBook(
 ): Promise<StudyBook> {
   const bookId = crypto.randomUUID();
   const now = new Date().toISOString();
+  const latest = await db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS value FROM study_books WHERE user_id = ?").bind(userId).first<{ value: number }>();
+  const sortOrder = Number(latest?.value ?? 0) + 1;
+  const cardRows = cards.map((card) => ({ card, id: crypto.randomUUID() }));
   const statements = [
-    db.prepare("INSERT INTO study_books (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").bind(bookId, userId, title, now, now),
-    ...cards.map((card) => {
+    db.prepare("INSERT INTO study_books (id, user_id, title, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").bind(bookId, userId, title, sortOrder, now, now),
+    ...cardRows.map(({ card, id }) => {
       const error = !card.result.translation || !card.result.sentence;
       return db
         .prepare(
@@ -97,7 +117,7 @@ export async function createBook(
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
-          crypto.randomUUID(),
+          id,
           bookId,
           card.term,
           card.normalizedTerm,
@@ -112,7 +132,8 @@ export async function createBook(
     }),
   ];
   await db.batch(statements);
-  return { id: bookId, user_id: userId, title, created_at: now, updated_at: now };
+  await Promise.all(cardRows.filter(({ card }) => card.tags?.length).map(({ id, card }) => replaceCardTags(db, userId, id, card.tags ?? [])));
+  return { id: bookId, user_id: userId, title, folder_name: "", sort_order: sortOrder, created_at: now, updated_at: now };
 }
 
 export async function addCards(
@@ -189,7 +210,7 @@ export async function listBooks(db: D1Database, userId: string): Promise<StudyBo
                )) AS due_count
      FROM study_books b
      WHERE b.user_id = ?
-     ORDER BY b.updated_at DESC`,
+     ORDER BY b.sort_order ASC, b.updated_at DESC`,
   ).bind(now, userId).all<StudyBookSummary>();
   return result.results;
 }
@@ -197,8 +218,11 @@ export async function listBooks(db: D1Database, userId: string): Promise<StudyBo
 export async function getBook(db: D1Database, userId: string, bookId: string): Promise<(StudyBook & { cards: Card[] }) | null> {
   const book = await db.prepare("SELECT * FROM study_books WHERE id = ? AND user_id = ?").bind(bookId, userId).first<StudyBook>();
   if (!book) return null;
-  const cards = await db.prepare("SELECT * FROM cards WHERE book_id = ? ORDER BY created_at").bind(bookId).all<Card>();
-  return { ...book, cards: cards.results };
+  const cards = await db.prepare(
+    `SELECT c.*, COALESCE((SELECT json_group_array(t.name) FROM card_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.card_id = c.id), '[]') AS tags_json
+     FROM cards c WHERE c.book_id = ? ORDER BY c.created_at`,
+  ).bind(bookId).all<Card & { tags_json: string }>();
+  return { ...book, cards: cards.results.map(({ tags_json, ...card }) => ({ ...card, tags: JSON.parse(tags_json) as string[] })) };
 }
 
 export async function deleteBook(db: D1Database, userId: string, bookId: string): Promise<boolean> {
@@ -206,13 +230,22 @@ export async function deleteBook(db: D1Database, userId: string, bookId: string)
   return result.meta.changes > 0;
 }
 
-export async function updateBookTitle(db: D1Database, userId: string, bookId: string, title: string): Promise<StudyBook | null> {
+export async function updateBook(db: D1Database, userId: string, bookId: string, input: { title?: string; folderName?: string }): Promise<StudyBook | null> {
   const now = new Date().toISOString();
+  const current = await db.prepare("SELECT * FROM study_books WHERE id = ? AND user_id = ?").bind(bookId, userId).first<StudyBook>();
+  if (!current) return null;
   const updated = await db.prepare(
-    "UPDATE study_books SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?",
-  ).bind(title, now, bookId, userId).run();
+    "UPDATE study_books SET title = ?, folder_name = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+  ).bind(input.title ?? current.title, input.folderName ?? current.folder_name, now, bookId, userId).run();
   if (updated.meta.changes === 0) return null;
   return db.prepare("SELECT * FROM study_books WHERE id = ? AND user_id = ?").bind(bookId, userId).first<StudyBook>();
+}
+
+export async function reorderBooks(db: D1Database, userId: string, bookIds: string[]): Promise<boolean> {
+  const existing = await db.prepare("SELECT id FROM study_books WHERE user_id = ? ORDER BY sort_order").bind(userId).all<{ id: string }>();
+  if (existing.results.length !== bookIds.length || existing.results.some((book) => !bookIds.includes(book.id))) return false;
+  await db.batch(bookIds.map((id, index) => db.prepare("UPDATE study_books SET sort_order = ? WHERE id = ? AND user_id = ?").bind(index + 1, id, userId)));
+  return true;
 }
 
 export async function updateCard(
@@ -220,7 +253,7 @@ export async function updateCard(
   userId: string,
   bookId: string,
   cardId: string,
-  input: { term: string; normalizedTerm: string; translation: string | null; sentence: string | null },
+  input: { term: string; normalizedTerm: string; translation: string | null; sentence: string | null; tags?: string[] },
 ): Promise<{ card: Card | null; duplicate: boolean }> {
   const ownedCard = await db.prepare(
     `SELECT c.id FROM cards c
@@ -245,10 +278,41 @@ export async function updateCard(
     ).bind(input.term, input.normalizedTerm, input.translation, input.sentence, cardId, bookId),
     db.prepare("UPDATE study_books SET updated_at = ? WHERE id = ? AND user_id = ?").bind(now, bookId, userId),
   ]);
+  if (input.tags) await replaceCardTags(db, userId, cardId, input.tags);
+  const card = await db.prepare("SELECT * FROM cards WHERE id = ? AND book_id = ?").bind(cardId, bookId).first<Card>();
   return {
-    card: await db.prepare("SELECT * FROM cards WHERE id = ? AND book_id = ?").bind(cardId, bookId).first<Card>(),
+    card: card ? { ...card, tags: input.tags ?? (await getCardTags(db, cardId)) } : null,
     duplicate: false,
   };
+}
+
+async function getCardTags(db: D1Database, cardId: string): Promise<string[]> {
+  const result = await db.prepare("SELECT t.name FROM card_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.card_id = ? ORDER BY t.name").bind(cardId).all<{ name: string }>();
+  return result.results.map((tag) => tag.name);
+}
+
+export async function addTagsToCards(db: D1Database, userId: string, bookId: string, cardIds: string[], tags: string[]): Promise<number> {
+  const owned = await db.prepare(
+    `SELECT c.id FROM cards c JOIN study_books b ON b.id = c.book_id WHERE c.book_id = ? AND b.user_id = ?`,
+  ).bind(bookId, userId).all<{ id: string }>();
+  if (cardIds.some((id) => !owned.results.some((card) => card.id === id))) return 0;
+  const statements: D1PreparedStatement[] = [];
+  for (const name of tags) {
+    statements.push(db.prepare("INSERT INTO tags (id, user_id, name) VALUES (?, ?, ?) ON CONFLICT(user_id, name) DO NOTHING").bind(crypto.randomUUID(), userId, name));
+    for (const cardId of cardIds) statements.push(db.prepare(`INSERT OR IGNORE INTO card_tags (card_id, tag_id) SELECT ?, id FROM tags WHERE user_id = ? AND name = ?`).bind(cardId, userId, name));
+  }
+  if (statements.length) await db.batch(statements);
+  return cardIds.length;
+}
+
+export async function deleteCards(db: D1Database, userId: string, bookId: string, cardIds: string[]): Promise<number> {
+  const statements = cardIds.map((cardId) => db.prepare(
+    `DELETE FROM cards WHERE id = ? AND book_id = ? AND EXISTS (SELECT 1 FROM study_books b WHERE b.id = cards.book_id AND b.user_id = ?)`,
+  ).bind(cardId, bookId, userId));
+  const results = await db.batch(statements);
+  const changes = results.reduce((total, result) => total + result.meta.changes, 0);
+  if (changes) await db.prepare("UPDATE study_books SET updated_at = ? WHERE id = ? AND user_id = ?").bind(new Date().toISOString(), bookId, userId).run();
+  return changes;
 }
 
 export async function deleteCard(db: D1Database, userId: string, bookId: string, cardId: string): Promise<boolean> {
@@ -264,7 +328,7 @@ export async function deleteCard(db: D1Database, userId: string, bookId: string,
   return true;
 }
 
-export async function findStudyCard(db: D1Database, userId: string, bookId: string, reveal: boolean): Promise<Record<string, unknown> | null> {
+export async function findStudyCard(db: D1Database, userId: string, bookId: string, reveal: boolean, options: { newFirst?: boolean; allowNew?: boolean } = {}): Promise<Record<string, unknown> | null> {
   const select = `SELECT c.*, latest.rating, latest.due_at, latest.interval_days, latest.ease_factor, latest.repetitions,
       latest.fsrs_state, latest.fsrs_stability, latest.fsrs_difficulty, latest.fsrs_elapsed_days,
       latest.fsrs_learning_steps, latest.fsrs_lapses, latest.reviewed_at
@@ -274,10 +338,12 @@ export async function findStudyCard(db: D1Database, userId: string, bookId: stri
       SELECT r.id FROM reviews r WHERE r.card_id = c.id ORDER BY r.reviewed_at DESC LIMIT 1
     )`;
   const queryNow = new Date().toISOString();
+  const newFirst = options.newFirst ?? true;
+  const allowNew = options.allowNew ?? true;
   let row = await db
     .prepare(`${select}
-       WHERE c.book_id = ? AND (latest.id IS NULL OR latest.due_at <= ?)
-       ORDER BY CASE WHEN latest.id IS NULL THEN 0 ELSE 1 END, COALESCE(latest.due_at, c.created_at), c.created_at
+       WHERE c.book_id = ? AND (${allowNew ? "latest.id IS NULL OR" : ""} latest.due_at <= ?)
+       ORDER BY CASE WHEN latest.id IS NULL THEN ${newFirst ? 0 : 1} ELSE ${newFirst ? 1 : 0} END, COALESCE(latest.due_at, c.created_at), c.created_at
        LIMIT 1`)
     .bind(userId, bookId, queryNow)
     .first<Record<string, unknown>>();
@@ -317,6 +383,76 @@ export async function findStudyCard(db: D1Database, userId: string, bookId: stri
     sentenceSourceUrl: row.sentence_source_url,
     reviewIntervals,
   };
+}
+
+export async function countTodayReviews(db: D1Database, userId: string): Promise<number> {
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const result = await db.prepare("SELECT COUNT(*) AS count FROM reviews WHERE user_id = ? AND reviewed_at >= ?").bind(userId, dayStart.toISOString()).first<{ count: number }>();
+  return Number(result?.count ?? 0);
+}
+
+export async function countTodayNewCards(db: D1Database, userId: string): Promise<number> {
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const result = await db.prepare(
+    `SELECT COUNT(*) AS count FROM (SELECT card_id, MIN(reviewed_at) AS first_reviewed_at FROM reviews WHERE user_id = ? GROUP BY card_id) WHERE first_reviewed_at >= ?`,
+  ).bind(userId, dayStart.toISOString()).first<{ count: number }>();
+  return Number(result?.count ?? 0);
+}
+
+export async function getLearningPreferences(db: D1Database, userId: string): Promise<LearningPreferences> {
+  const preference = await db.prepare(
+    "SELECT daily_review_limit, daily_new_card_limit, review_order FROM learning_preferences WHERE user_id = ?",
+  ).bind(userId).first<LearningPreferences>();
+  return preference ?? { daily_review_limit: 50, daily_new_card_limit: 20, review_order: "new_first" };
+}
+
+export async function saveLearningPreferences(db: D1Database, userId: string, preference: LearningPreferences): Promise<void> {
+  await db.prepare(
+    `INSERT INTO learning_preferences (user_id, daily_review_limit, daily_new_card_limit, review_order, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET daily_review_limit = excluded.daily_review_limit,
+       daily_new_card_limit = excluded.daily_new_card_limit, review_order = excluded.review_order, updated_at = excluded.updated_at`,
+  ).bind(userId, preference.daily_review_limit, preference.daily_new_card_limit, preference.review_order, new Date().toISOString()).run();
+}
+
+export async function getReminderPreferences(db: D1Database, userId: string): Promise<ReminderPreferences> {
+  const preference = await db.prepare("SELECT enabled, reminder_time FROM reminder_preferences WHERE user_id = ?").bind(userId).first<ReminderPreferences>();
+  return preference ?? { enabled: 0, reminder_time: "19:00" };
+}
+
+export async function saveReminderPreferences(db: D1Database, userId: string, preference: ReminderPreferences): Promise<void> {
+  await db.prepare(
+    `INSERT INTO reminder_preferences (user_id, enabled, reminder_time, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET enabled = excluded.enabled, reminder_time = excluded.reminder_time, updated_at = excluded.updated_at`,
+  ).bind(userId, preference.enabled, preference.reminder_time, new Date().toISOString()).run();
+}
+
+export async function getLearningStats(db: D1Database, userId: string) {
+  const since7 = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const [totals, ratings, activity, mastered] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN reviewed_at >= ? THEN 1 ELSE 0 END) AS last7, SUM(CASE WHEN reviewed_at >= ? THEN 1 ELSE 0 END) AS last30 FROM reviews WHERE user_id = ?`).bind(since7, since30, userId).first<{ total: number; last7: number | null; last30: number | null }>(),
+    db.prepare("SELECT rating, COUNT(*) AS count FROM reviews WHERE user_id = ? GROUP BY rating").bind(userId).all<{ rating: string; count: number }>(),
+    db.prepare(`SELECT substr(reviewed_at, 1, 10) AS day, COUNT(*) AS count FROM reviews WHERE user_id = ? AND reviewed_at >= ? GROUP BY day ORDER BY day`).bind(userId, since7).all<{ day: string; count: number }>(),
+    db.prepare(`SELECT COUNT(*) AS count FROM cards c JOIN study_books b ON b.id = c.book_id WHERE b.user_id = ? AND (SELECT interval_days FROM reviews r WHERE r.card_id = c.id ORDER BY reviewed_at DESC LIMIT 1) >= 21`).bind(userId).first<{ count: number }>(),
+  ]);
+  const ratingCounts = Object.fromEntries(ratings.results.map((rating) => [rating.rating, Number(rating.count)]));
+  return {
+    totalReviews: Number(totals?.total ?? 0), last7Days: Number(totals?.last7 ?? 0), last30Days: Number(totals?.last30 ?? 0),
+    masteredCards: Number(mastered?.count ?? 0), ratings: { again: ratingCounts.again ?? 0, hard: ratingCounts.hard ?? 0, good: ratingCounts.good ?? 0, easy: ratingCounts.easy ?? 0 },
+    activity: activity.results.map((item) => ({ day: item.day, count: Number(item.count) })),
+  };
+}
+
+export async function exportUserCsvRows(db: D1Database, userId: string): Promise<Array<{ book_title: string; term: string; translation: string | null; sentence: string | null; tags: string }>> {
+  const rows = await db.prepare(
+    `SELECT b.title AS book_title, c.term, c.translation, c.sentence,
+       COALESCE((SELECT group_concat(t.name, '|') FROM card_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.card_id = c.id), '') AS tags
+     FROM cards c JOIN study_books b ON b.id = c.book_id WHERE b.user_id = ? ORDER BY b.sort_order, c.created_at`,
+  ).bind(userId).all<{ book_title: string; term: string; translation: string | null; sentence: string | null; tags: string }>();
+  return rows.results;
 }
 
 export async function saveReview(
