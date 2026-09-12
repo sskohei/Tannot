@@ -225,7 +225,107 @@ textarea { min-height: 10rem; resize: vertical; }
 .legal-table dt { background: #fffdf7; font-weight: 800; }
 .legal-table dd { color: #655f69; line-height: 1.7; }
 
+/* Public introduction: reuse the app palette, typography, panels and buttons. */
+.landing { display: grid; gap: 5rem; padding-top: 1rem; }
+.landing .button { gap: .55rem; }
+.landing-hero { align-items: center; display: grid; gap: 2rem; grid-template-columns: 1.15fr 1fr; padding: 1.5rem 0 0; }
+.landing-hero-copy h1 { color: var(--coral); font-size: clamp(2rem, 4.2vw, 2.85rem); letter-spacing: -.045em; line-height: 1.4; margin: 1.4rem 0; }
+.landing-hero-copy h1 span { color: var(--ink); display: block; font-size: .52em; letter-spacing: -.025em; margin-top: .8rem; }
+.landing-lead { color: #655f69; font-size: .92rem; line-height: 1.95; }
+.landing-note { color: var(--muted); font-size: .72rem; line-height: 1.7; margin: 1rem 0 0; }
+.landing-demo-wrap { min-width: 0; position: relative; }
+.landing-demo-caption { font-size: .78rem; font-weight: 800; margin: 0 0 1rem; text-align: center; transform: rotate(-3deg); }
+.landing-demo-caption span { color: var(--coral); font-size: 1.3rem; }
+.landing-demo { position: relative; text-align: center; }
+.landing-demo::before { background: var(--yellow); border: 2px solid var(--ink); border-radius: 1.75rem; content: ""; inset: .35rem -.35rem -.5rem .35rem; position: absolute; transform: rotate(3deg); z-index: -1; }
+.landing-demo-top { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
+.landing-demo-top > span:last-child { color: var(--muted); font-size: .75rem; }
+.landing-demo-word { margin: 1.8rem 0 1.1rem; }
+.landing-demo-word p { color: var(--muted); font-size: .75rem; margin-bottom: .8rem; }
+.landing-demo-word h2 { font-size: clamp(1.8rem, 3.5vw, 2.7rem); margin: 0; overflow-wrap: anywhere; }
+.landing-demo-answer { align-content: center; display: grid; gap: .65rem; min-height: 10rem; padding: 1rem 0; }
+.landing-demo-answer p { font-size: .85rem; line-height: 1.65; margin: 0; }
+.landing-demo-answer .landing-demo-translation { font-size: 1.05rem; font-weight: 800; }
+.landing-demo-answer .button { justify-self: center; }
+.landing-demo-hint { color: var(--muted); }
+.landing-demo-controls { align-items: center; border-top: 2px dashed #f0dfc7; display: flex; gap: .75rem; justify-content: space-between; padding-top: 1rem; }
+.landing-demo-controls .text-button { font-size: .8rem; }
+.landing-demo-note { font-size: .65rem; text-align: center; }
+.landing-demo-spark { color: var(--coral); font-size: 2.5rem; position: absolute; right: -.6rem; top: 1.2rem; transform: rotate(12deg); }
+.landing-intro { align-items: center; border-bottom: 2px solid #f0dfc7; border-top: 2px solid #f0dfc7; display: flex; flex-wrap: wrap; gap: .8rem 1.4rem; justify-content: center; padding: 1.65rem 0; }
+.landing-intro > span { color: var(--muted); font-size: .8rem; }
+.landing-intro p { align-items: center; display: flex; gap: 1rem; margin: 0; }
+.landing-intro strong { font-size: 1.1rem; }
+.landing-intro p > span { color: var(--coral); }
+.landing-section { scroll-margin-top: 2rem; }
+.landing-section-heading { margin-bottom: 2rem; }
+.landing-section-heading h2, .landing-cta h2 { font-size: clamp(1.6rem, 3.6vw, 2.4rem); letter-spacing: -.035em; line-height: 1.45; margin: .65rem 0 1rem; }
+.landing-section-heading > p:not(.eyebrow), .landing-cta > p:not(.eyebrow) { color: #655f69; font-size: .9rem; line-height: 1.9; }
+.landing-features { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.landing-feature { border-radius: 1.5rem; padding: 1.1rem; }
+.landing-feature-art { align-items: center; border-radius: .8rem; display: flex; flex-direction: column; height: 9rem; justify-content: center; margin-bottom: 1.5rem; overflow: hidden; padding: 1rem; }
+.landing-art-words { background: var(--yellow); gap: .6rem; }
+.landing-word-chip { background: var(--paper); border: 2px solid var(--ink); border-radius: .65rem; box-shadow: 3px 3px 0 var(--ink); font-size: .9rem; font-weight: 800; padding: .5rem 1rem; transform: rotate(-6deg); }
+.landing-word-chip + .landing-word-chip { font-size: .75rem; margin-left: 2rem; transform: rotate(4deg); }
+.landing-art-sound { background: var(--blue); gap: .4rem; }
+.landing-sound-word { font-size: 1.35rem; font-weight: 900; }
+.landing-wave { align-items: center; display: flex; gap: .4rem; height: 3.5rem; }
+.landing-wave i { background: var(--ink); border-radius: 999px; width: .4rem; }
+.landing-art-review { background: var(--mint); color: var(--mint-ink); gap: .7rem; }
+.landing-review-days { display: flex; font-size: .8rem; font-weight: 800; justify-content: space-between; width: 100%; }
+.landing-review-line { font-size: 1.2rem; white-space: nowrap; }
+.landing-review-note { font-size: .65rem; }
+.landing-feature .landing-feature-label { color: var(--muted); font-size: .62rem; font-weight: 800; letter-spacing: .05em; }
+.landing-feature h3 { font-size: 1.05rem; line-height: 1.65; white-space: pre-line; }
+.landing-feature > p:last-child { color: #655f69; font-size: .82rem; line-height: 1.85; margin-bottom: .25rem; }
+.landing-how { align-items: center; display: grid; gap: 2rem; grid-template-columns: .9fr 1.1fr; padding: 2.5rem; }
+.landing-how .landing-section-heading { margin-bottom: 0; }
+.landing-how .landing-section-heading h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
+.landing-how .landing-section-heading .button { margin-top: .6rem; }
+.landing-steps { display: grid; gap: 1.6rem; list-style: none; margin: 0; padding: 0; }
+.landing-steps li { display: grid; gap: .85rem; grid-template-columns: 2rem minmax(0, 1fr); }
+.landing-step-number { align-items: center; background: var(--yellow); border: 2px solid var(--ink); border-radius: 50%; display: flex; font-weight: 900; height: 2rem; justify-content: center; }
+.landing-steps li:nth-child(2) .landing-step-number { background: var(--blue); }
+.landing-steps li:nth-child(3) .landing-step-number { background: var(--mint); }
+.landing-steps h3 { font-size: .95rem; line-height: 1.65; margin-bottom: .4rem; }
+.landing-steps p { color: #655f69; font-size: .8rem; line-height: 1.8; margin: 0; }
+.landing-input-example { background: var(--cream); border: 2px solid var(--yellow); border-radius: .7rem; font-size: .75rem; line-height: 1.6; margin-top: .7rem; padding: .65rem; }
+.landing-faq { display: grid; gap: 2rem; grid-template-columns: .8fr 1.2fr; }
+.landing-questions { border-top: 2px solid #f0dfc7; }
+.landing-questions details { border-bottom: 2px solid #f0dfc7; padding: 1.25rem 0; }
+.landing-questions summary { color: var(--ink); font-size: .9rem; font-weight: 800; line-height: 1.7; }
+.landing-questions details p { color: #655f69; font-size: .85rem; line-height: 1.9; margin: 1rem 0 0; }
+.landing-questions a { color: var(--coral); text-decoration: underline; text-underline-offset: .2em; }
+.landing-cta { background: #ffedc5; padding: 3rem 1.5rem; position: relative; text-align: center; }
+.landing-cta .hero-actions { justify-content: center; }
+.landing-cta-spark { color: var(--coral); font-size: 3rem; left: 9%; position: absolute; top: 2.5rem; transform: rotate(-10deg); }
+
+@media (max-width: 800px) {
+  .landing-hero { gap: 1.5rem; grid-template-columns: 1fr; }
+  .landing-hero-copy { text-align: center; }
+  .landing-hero-copy h1 { font-size: clamp(2rem, 6.5vw, 3rem); }
+  .landing-hero-copy .hero-actions { justify-content: center; }
+  .landing-demo-wrap { margin: 1rem auto 0; max-width: 27rem; width: 100%; }
+  .landing-features { grid-template-columns: 1fr; }
+  .landing-feature { column-gap: 1.5rem; display: grid; grid-template-columns: 11rem 1fr; }
+  .landing-feature-art { align-self: center; grid-row: 1 / 4; margin: 0; }
+  .landing-feature h3 { white-space: normal; }
+  .landing-feature .landing-feature-label { margin: .25rem 0 .6rem; }
+  .landing-how { gap: 2.5rem; grid-template-columns: 1fr; }
+  .landing-faq { gap: 0; grid-template-columns: 1fr; }
+}
+
 @media (max-width: 600px) {
+  .landing { gap: 3.5rem; padding-top: 0; }
+  .landing-hero { padding-top: .5rem; }
+  .landing-lead { font-size: .85rem; }
+  .landing-intro { flex-direction: column; gap: .75rem; }
+  .landing-feature { display: block; }
+  .landing-feature-art { margin-bottom: 1.25rem; }
+  .landing-feature h3 { font-size: 1.15rem; }
+  .landing-section-heading { margin-bottom: 1.5rem; }
+  .landing-cta-spark { font-size: 1.5rem; left: 1rem; top: .75rem; }
+  .site-nav .nav-link { padding: .7rem .5rem; }
   .site-header { padding-top: 1rem; position: relative; }
   .menu-toggle { display: inline-flex; }
   .site-header nav.site-nav { align-items: stretch; background: var(--paper); border: 2px solid var(--ink); border-radius: 1rem; box-shadow: 4px 4px 0 var(--ink); display: none; flex-direction: column; gap: .45rem; padding: .75rem; position: absolute; right: 1rem; top: 4rem; width: min(14rem, calc(100vw - 2rem)); z-index: 100; }

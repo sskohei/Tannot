@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthButton } from "@/components/AuthButton";
 
 export function SiteHeaderNav() {
+  const isHome = usePathname() === "/";
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
@@ -28,9 +30,15 @@ export function SiteHeaderNav() {
       <span className="menu-icon" aria-hidden="true"><span /><span /><span /></span>
     </button>
     <nav id="site-navigation" className={`site-nav${isOpen ? " is-open" : ""}`} aria-label="メインナビゲーション" onClick={() => setIsOpen(false)}>
-      <Link className="button secondary" href="/settings">設定</Link>
-      <Link className="button secondary" href="/stats">学習統計</Link>
-      <Link className="button secondary" href="/dashboard">今日の復習</Link>
+      {isHome ? <>
+        <a className="nav-link" href="#features">Tannotの特徴</a>
+        <a className="nav-link" href="#how-it-works">使い方</a>
+        <Link className="nav-link" href="/pricing">料金</Link>
+      </> : <>
+        <Link className="button secondary" href="/settings">設定</Link>
+        <Link className="button secondary" href="/stats">学習統計</Link>
+        <Link className="button secondary" href="/dashboard">今日の復習</Link>
+      </>}
       <Link className="button" href="/books">単語帳</Link>
       <AuthButton />
     </nav>
