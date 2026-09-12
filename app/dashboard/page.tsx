@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DailyReminder, PremiumStats } from "@/components/PremiumLearning";
+import { DailyReminder } from "@/components/PremiumLearning";
 
 type SummaryBook = { id: string; title: string; card_count: number; due_count: number };
 type Summary = { totalDue: number; totalCards: number; books: SummaryBook[] };
@@ -38,6 +38,5 @@ export default function DashboardPage() {
       {summary.books.length === 0 && <section className="info-panel stack"><p>単語帳を作ると、ここに今日の復習件数が表示されます。</p><Link className="button" href="/books">最初の単語帳を作る</Link></section>}
       {summary.books.length > 0 && summary.totalDue === 0 && <p className="success" role="status">今日の復習は完了です。おつかれさまでした。</p>}
     </section>
-    <PremiumStats />
   </div>;
 }

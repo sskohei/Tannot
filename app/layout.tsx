@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { AuthButton } from "@/components/AuthButton";
 import Image from "next/image";
 import { PolicyRedirect } from "@/components/PolicyRedirect";
+import { SiteHeaderNav } from "@/components/SiteHeaderNav";
 
 export const metadata: Metadata = {
   title: "Tannot",
@@ -21,13 +21,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <Image src="/images/logo.svg" alt="Tannot Logo" width={32} height={32} />
             Tannot
           </Link>
-          <nav aria-label="メインナビゲーション">
-            <Link className="button secondary" href="/pricing">料金</Link>
-            <Link className="button secondary" href="/settings">設定</Link>
-            <Link className="button secondary" href="/dashboard">今日の復習</Link>
-            <Link className="button" href="/books">単語帳</Link>
-            <AuthButton />
-          </nav>
+          <SiteHeaderNav />
         </header>
         <main className="container" id="main-content">{children}</main>
         <footer className="site-footer">

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import { PremiumLearningSettings } from "@/components/PremiumLearning";
+import { PremiumFeaturesPreview, PremiumLearningSettings } from "@/components/PremiumLearning";
 
 type Subscription = {
   status: string;
@@ -179,7 +179,7 @@ export default function SettingsPage() {
       {me.policyAcceptance?.terms_version && <p className="form-note">同意済み規約版：{me.policyAcceptance.terms_version}／プライバシーポリシー版：{me.policyAcceptance.privacy_version ?? "未記録"}</p>}
       <p className="form-note">プレミアムは月額500円（税込）です。7日間の無料トライアル後、初回課金日と同じ日付に毎月自動更新されます。カード、Apple Pay、Google Payに対応しています。</p>
     </section>
-    {premium && <PremiumLearningSettings />}
+    {premium ? <PremiumLearningSettings /> : <PremiumFeaturesPreview />}
     <section className="panel stack">
       <h2>データ管理</h2>
       <p className="muted">単語帳、カード、学習履歴をJSON形式で、カードをCSV形式でダウンロードできます。</p>
