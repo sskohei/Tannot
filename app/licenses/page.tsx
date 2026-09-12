@@ -1,3 +1,5 @@
+import lookupManifest from "@/public/data/lookup/manifest.json";
+
 const mitLicense = `MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,15 +21,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`;
 
 const packages = [
-  ["ts-fsrs", "5.4.1", "Copyright (c) 2026 Open Spaced Repetition", "https://github.com/open-spaced-repetition/ts-fsrs"],
-  ["@opennextjs/cloudflare", "1.20.2", "Copyright (c) 2020 Cloudflare, Inc.", "https://github.com/opennextjs/opennextjs-cloudflare"],
-  ["@stripe/stripe-js", "7.9.0", "Copyright (c) 2017 Stripe", "https://github.com/stripe/stripe-js"],
-  ["better-auth", "1.7.1", "Copyright (c) 2024 - present, Bereket Engida", "https://github.com/better-auth/better-auth"],
-  ["hono", "4.13.3", "Copyright (c) 2021 - present, Yusuke Wada and Hono contributors", "https://github.com/honojs/hono"],
-  ["next", "16.3.1", "Copyright (c) 2025 Vercel, Inc.", "https://github.com/vercel/next.js"],
-  ["react", "19.2.8", "Copyright (c) Meta Platforms, Inc. and affiliates.", "https://github.com/facebook/react"],
-  ["react-dom", "19.2.8", "Copyright (c) Meta Platforms, Inc. and affiliates.", "https://github.com/facebook/react"],
-  ["stripe", "22.5.0", "Copyright (C) 2011 Ask Bjørn Hansen; Copyright (C) 2013 Stripe, Inc.", "https://github.com/stripe/stripe-node"],
+  ["ts-fsrs", "5.4.1", "Copyright (c) 2026 Open Spaced Repetition", "https://github.com/open-spaced-repetition/ts-fsrs", "https://github.com/open-spaced-repetition/ts-fsrs/blob/main/LICENSE"],
+  ["@opennextjs/cloudflare", "1.20.2", "Copyright (c) 2020 Cloudflare, Inc.", "https://github.com/opennextjs/opennextjs-cloudflare", "https://github.com/opennextjs/opennextjs-cloudflare/blob/main/LICENSE"],
+  ["@stripe/stripe-js", "7.9.0", "Copyright (c) 2017 Stripe", "https://github.com/stripe/stripe-js", "https://github.com/stripe/stripe-js/blob/master/LICENSE"],
+  ["better-auth", "1.7.1", "Copyright (c) 2024 - present, Bereket Engida", "https://github.com/better-auth/better-auth", "https://github.com/better-auth/better-auth/blob/main/LICENSE.md"],
+  ["hono", "4.13.3", "Copyright (c) 2021 - present, Yusuke Wada and Hono contributors", "https://github.com/honojs/hono", "https://github.com/honojs/hono/blob/main/LICENSE"],
+  ["next", "16.3.1", "Copyright (c) 2025 Vercel, Inc.", "https://github.com/vercel/next.js", "https://github.com/vercel/next.js/blob/canary/license.md"],
+  ["react", "19.2.8", "Copyright (c) Meta Platforms, Inc. and affiliates.", "https://github.com/facebook/react", "https://github.com/facebook/react/blob/main/LICENSE"],
+  ["react-dom", "19.2.8", "Copyright (c) Meta Platforms, Inc. and affiliates.", "https://github.com/facebook/react", "https://github.com/facebook/react/blob/main/LICENSE"],
+  ["stripe", "22.5.0", "Copyright (C) 2011 Ask Bjørn Hansen; Copyright (C) 2013 Stripe, Inc.", "https://github.com/stripe/stripe-node", "https://github.com/stripe/stripe-node/blob/master/LICENSE"],
 ] as const;
 
 export default function LicensesPage() {
@@ -36,19 +38,19 @@ export default function LicensesPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">OPEN SOURCE</p>
-          <h1>ライセンス</h1>
+          <h1>OSS・データのライセンス</h1>
           <p>本アプリで利用している第三者ソフトウェアとデータの帰属情報です。</p>
         </div>
       </div>
 
       <section className="info-panel stack">
         <div className="section-title"><h2>ソフトウェア</h2></div>
-        <p>以下の直接依存パッケージはMITライセンスです。各パッケージの著作権表示とライセンス本文を保持しています。</p>
+        <p>以下は、配布物に含まれる直接依存パッケージです。いずれもMITライセンスで提供されています。バージョンは公開中のロックファイルに基づきます。</p>
         <ul className="license-list">
-          {packages.map(([name, version, copyright, source]) => (
+          {packages.map(([name, version, copyright, source, licenseSource]) => (
             <li key={name}>
               <strong>{name}</strong> <span className="muted">v{version}</span>
-              <br />{copyright} · <a href={source} target="_blank" rel="noopener noreferrer">公式リポジトリ</a>
+              <br />{copyright} · <a href={source} target="_blank" rel="noopener noreferrer">公式リポジトリ</a> · <a href={licenseSource} target="_blank" rel="noopener noreferrer">ライセンス</a>
             </li>
           ))}
         </ul>
@@ -60,8 +62,10 @@ export default function LicensesPage() {
 
       <section className="info-panel stack">
         <div className="section-title"><h2>データ</h2></div>
-        <p>EJDictの辞書データはCC0 1.0 Universalです。</p>
-        <p>Tatoeba Projectの例文データはCC BY 2.0 FRです。例文の出典リンクはカード上にも表示されます。</p>
+        <p><a href="https://github.com/kujirahand/EJDict" target="_blank" rel="noopener noreferrer">EJDict</a>の辞書データは<a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer">CC0 1.0 Universal</a>です。本アプリではEJCSVに取り込んだ検索用データを利用しています。</p>
+        <p><a href="https://tatoeba.org/" target="_blank" rel="noopener noreferrer">Tatoeba Project</a>の例文データは<a href="https://creativecommons.org/licenses/by/2.0/fr/" target="_blank" rel="noopener noreferrer">CC BY 2.0 FR</a>です。例文の出典リンクはカード上にも表示されます。</p>
+        <p className="muted">公開中の検索アセット：{lookupManifest.source} {lookupManifest.sourceVersion}（生成日：{lookupManifest.generatedAt.slice(0, 10)}／{lookupManifest.entries.toLocaleString("ja-JP")}件）</p>
+        <p className="muted">ユーザーが入力・編集した単語帳やカードに、このページの第三者ライセンスが付与されるものではありません。</p>
       </section>
 
       <section className="info-panel stack">
