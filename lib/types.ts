@@ -26,6 +26,7 @@ export type Card = {
   sentence_source_url: string | null;
   error_code: string | null;
   error_message: string | null;
+  tags?: string[];
   created_at: string;
 };
 
@@ -33,6 +34,8 @@ export type StudyBook = {
   id: string;
   user_id: string;
   title: string;
+  folder_name: string;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 };

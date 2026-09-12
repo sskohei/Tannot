@@ -7,18 +7,26 @@
 | GET | `/api/me` | 現在のユーザーと利用枠 |
 | POST | `/api/account/consent` | 年齢等の確認と現在の規約版への同意を保存 |
 | GET | `/api/account/export` | 単語帳・カード・学習履歴をJSONで出力 |
+| GET | `/api/account/export.csv` | カードをCSVで出力 |
 | DELETE | `/api/account` | 無料プランまたは利用終了後のアカウントを削除 |
 | POST | `/api/books/preview` | 新しい単語帳の作成前に訳・例文を確認 |
 | POST | `/api/books` | 入力リストから単語帳を作成 |
 | GET | `/api/books` | 自分の単語帳一覧 |
+| POST | `/api/books/import-csv` | CSVから単語帳を作成 |
+| PATCH | `/api/books/reorder` | 自分の単語帳を並べ替え |
 | GET | `/api/books/:bookId` | 自分の単語帳詳細 |
 | PATCH | `/api/books/:bookId` | 自分の単語帳名を変更 |
 | POST | `/api/books/:bookId/cards/preview` | 追加前に訳・例文を確認 |
 | POST | `/api/books/:bookId/cards` | 自分の単語帳に単語を追加 |
 | PATCH | `/api/books/:bookId/cards/:cardId` | 自分のカードを編集 |
+| POST | `/api/books/:bookId/cards/tags` | 選択したカードへタグを追加 |
+| DELETE | `/api/books/:bookId/cards` | 選択したカードを一括削除 |
 | DELETE | `/api/books/:bookId/cards/:cardId` | 自分のカードと学習履歴を削除 |
 | DELETE | `/api/books/:bookId` | 自分の単語帳を削除 |
 | GET | `/api/study/summary` | 単語帳ごとのカード数・現在の復習件数 |
+| GET/PUT | `/api/study/preferences` | プレミアムの出題順・1日上限を取得／更新 |
+| GET/PUT | `/api/study/reminder` | プレミアムのブラウザ通知設定を取得／更新 |
+| GET | `/api/study/stats` | プレミアムの学習統計 |
 | GET | `/api/study/next?bookId=` | 次に学習するカード |
 | POST | `/api/study/reviews` | 評価を保存し次回復習日を返す |
 | POST | `/api/billing/checkout` | Stripe Checkout セッション作成 |
@@ -33,6 +41,8 @@
 
 `POST /api/books` の入力は `{ "title": "...", "input": "run\\ngive up" }` です。入力は最大100件、1項目100文字、全体10,000文字に制限します。空行・重複は正規化して除外します。
 
+CSVの読み込みは `book_title,term,translation,sentence,tags` ヘッダーを使用します。`book_title` と `term` は必須で、タグは `|` 区切りです。CSV出力は数式として解釈される先頭文字を安全にエスケープします。
+
 `POST /api/books/preview` は同じ入力形式で、保存せずに日本語訳・例文を返します。確認後に `POST /api/books` を呼び出して単語帳を作成します。
 
 `POST /api/books/:bookId/cards` の入力は `{ "input": "review\\nmake progress" }` です。単語帳の所有者だけが利用でき、単語の制限は単語帳作成時と同じです。既存カードと同じ単語はスキップし、追加されたカードとスキップされた単語を返します。
@@ -41,7 +51,9 @@
 
 無料プランでは、単語帳は最大3冊、各単語帳のカードは最大100枚です。これらの制限は、作成・追加・プレビューのすべてでサーバー側に適用されます。プレミアムの契約状態はStripe webhookで同期し、`active` または `trialing` の場合のみ制限を解除します。
 
-`PATCH /api/books/:bookId` は `{ "title": "変更後の名前" }`、`PATCH /api/books/:bookId/cards/:cardId` は `{ "term": "run", "translation": "走る", "sentence": "I run." }` を受け取ります。カードを編集すると、辞書・例文データと利用者の編集内容を混同しないため、保存済みの例文出典情報を外します。
+`PATCH /api/books/:bookId` は `{ "title": "変更後の名前", "folderName": "TOEIC" }`、`PATCH /api/books/:bookId/cards/:cardId` は `{ "term": "run", "translation": "走る", "sentence": "I run.", "tags": ["動詞"] }` を受け取ります。カードを編集すると、辞書・例文データと利用者の編集内容を混同しないため、保存済みの例文出典情報を外します。
+
+学習統計、1日の新規／復習カード上限、出題順、リマインダー設定はプレミアム限定です。リマインダーはWeb Notifications APIを使うブラウザ通知であり、通知許可済みのブラウザでTannotを開いているときにのみ表示されます。
 
 `POST /api/billing/checkout` は `{ "termsAccepted": true, "eligibilityAccepted": true }` を受け取り、利用規約・プライバシーポリシーの版と同意日時、13歳以上かつ未成年の場合の保護者同意確認を保存したうえで、7日間の無料トライアル付き月額プランのStripe Checkoutを作成します。同じ利用者に有効な未完了セッションがある場合はそのURLを再利用し、連打や通信再送による重複セッション作成を防ぎます。決済手段はコードで固定せず、Stripe Dashboardの動的決済手段でカード、Apple Pay、Google Payを有効にします。`POST /api/billing/portal` は、支払い方法、請求書および解約を利用者自身で管理するためのCustomer Portalを返します。
 

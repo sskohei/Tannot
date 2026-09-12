@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { authClient } from "@/lib/auth-client";
 
-const protectedPrefixes = ["/books", "/dashboard", "/study", "/settings"];
+const protectedPrefixes = ["/books", "/dashboard", "/study", "/settings", "/stats"];
 
 export function PolicyRedirect() {
   const pathname = usePathname();

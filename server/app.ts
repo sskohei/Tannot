@@ -5,35 +5,47 @@ import Stripe from "stripe";
 import { isPremiumStatus, isWithinFreeCardLimit } from "@/lib/billing";
 import { PRIVACY_VERSION, TERMS_VERSION } from "@/lib/policies";
 import { calculateReview } from "@/lib/review";
-import { normalizeTerm, parseCardCopy, parseCardTerm, parseRating, parseRequestId, parseTerms, parseTitle } from "@/lib/validation";
+import { normalizeTerm, parseCardCopy, parseCardTerm, parseFolderName, parseIdList, parseRating, parseRequestId, parseTags, parseTerms, parseTitle, ValidationError } from "@/lib/validation";
 import type { Bindings } from "@/lib/types";
 import { createAuth, getEnvValue } from "@/server/auth";
 import { processStripeWebhookEvent } from "@/server/billing";
 import { findLookupResults } from "@/server/lookup-data";
 import {
   addCards,
+  addTagsToCards,
+  countTodayNewCards,
+  countTodayReviews,
   countUserBooks,
   createBook,
+  deleteCards,
   deleteCard,
   deleteUserData,
   deleteBook,
   ensureUser,
   exportUserData,
+  exportUserCsvRows,
   findPendingCheckoutSession,
   findPolicyAcceptance,
   findStudyCard,
   findSubscription,
+  getLearningPreferences,
+  getLearningStats,
+  getReminderPreferences,
   getBook,
   latestReview,
   listBooks,
   recordPolicyAcceptance,
+  reorderBooks,
   claimPendingCheckoutSession,
   releasePendingCheckoutSession,
   savePendingCheckoutSession,
   saveReview,
-  updateBookTitle,
+  saveLearningPreferences,
+  saveReminderPreferences,
+  updateBook,
   updateCard,
 } from "@/server/db";
+import { createCardsCsv, parseImportedBooksCsv } from "@/server/csv";
 import { jsonError, toErrorResponse } from "@/server/errors";
 
 type Variables = { user: { id: string; email: string; name: string } };
@@ -53,6 +65,22 @@ function checkoutIntegrationIdentifier(): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz";
   const random = crypto.getRandomValues(new Uint8Array(8));
   return `tannot_checkout_${Array.from(random, (value) => alphabet[value % alphabet.length]).join("")}`;
+}
+
+async function requirePremium(c: AppContext, userId: string) {
+  const subscription = await findSubscription(c.env.DB, userId);
+  if (!isPremiumStatus(subscription?.status)) throw new HTTPException(403, { res: jsonError("PREMIUM_REQUIRED", "この機能はプレミアムプランで利用できます", 403) });
+}
+
+function parsePositiveLimit(value: unknown, label: string): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 500) throw new ValidationError(`${label}は1〜500で設定してください`);
+  return parsed;
+}
+
+function parseReminderTime(value: unknown): string {
+  if (typeof value !== "string" || !/^([01]\\d|2[0-3]):[0-5]\\d$/u.test(value)) throw new ValidationError("通知時刻を確認してください");
+  return value;
 }
 
 async function requireUser(c: AppContext) {
@@ -160,6 +188,35 @@ app.get("/api/books", async (c) => {
   return c.json({ books: await listBooks(c.env.DB, user.id) });
 });
 
+app.post("/api/books/import-csv", async (c) => {
+  const user = await requireUser(c);
+  const body = await c.req.json<{ csv?: unknown }>();
+  const imports = parseImportedBooksCsv(body.csv);
+  const subscription = await findSubscription(c.env.DB, user.id);
+  const premium = isPremiumStatus(subscription?.status);
+  const currentBooks = await countUserBooks(c.env.DB, user.id);
+  const freeBookLimit = Number(c.env.FREE_BOOK_LIMIT ?? 3);
+  if (!premium && currentBooks + imports.length > freeBookLimit) return jsonError("QUOTA_EXCEEDED", `無料プランでは単語帳は${freeBookLimit}冊までです`, 429);
+  const freeCardLimit = Number(c.env.FREE_CARDS_PER_BOOK_LIMIT ?? 100);
+  if (!premium && imports.some((book) => book.cards.length > freeCardLimit)) return jsonError("QUOTA_EXCEEDED", `無料プランでは単語帳1つにつき${freeCardLimit}枚までです`, 429);
+  const books = [];
+  for (const item of imports) {
+    books.push(await createBook(c.env.DB, user.id, item.title, item.cards.map((card) => ({
+      term: card.term, normalizedTerm: normalizeTerm(card.term), tags: card.tags,
+      result: { translation: card.translation, sentence: card.sentence, sourceId: null, author: null, sourceUrl: null },
+    }))));
+  }
+  return c.json({ books, importedCards: imports.reduce((total, book) => total + book.cards.length, 0) }, 201);
+});
+
+app.patch("/api/books/reorder", async (c) => {
+  const user = await requireUser(c);
+  const body = await c.req.json<{ bookIds?: unknown }>();
+  const reordered = await reorderBooks(c.env.DB, user.id, parseIdList(body.bookIds, "単語帳の並び順"));
+  if (!reordered) return jsonError("VALIDATION_ERROR", "単語帳の並び順を確認してください", 400);
+  return c.json({ reordered: true });
+});
+
 app.get("/api/study/summary", async (c) => {
   const user = await requireUser(c);
   const books = await listBooks(c.env.DB, user.id);
@@ -168,6 +225,44 @@ app.get("/api/study/summary", async (c) => {
     totalCards: books.reduce((total, book) => total + Number(book.card_count), 0),
     books,
   });
+});
+
+app.get("/api/study/stats", async (c) => {
+  const user = await requireUser(c);
+  await requirePremium(c, user.id);
+  return c.json({ stats: await getLearningStats(c.env.DB, user.id) });
+});
+
+app.get("/api/study/preferences", async (c) => {
+  const user = await requireUser(c);
+  await requirePremium(c, user.id);
+  return c.json({ preferences: await getLearningPreferences(c.env.DB, user.id) });
+});
+
+app.put("/api/study/preferences", async (c) => {
+  const user = await requireUser(c);
+  await requirePremium(c, user.id);
+  const body = await c.req.json<{ dailyReviewLimit?: unknown; dailyNewCardLimit?: unknown; reviewOrder?: unknown }>();
+  if (body.reviewOrder !== "new_first" && body.reviewOrder !== "due_first") throw new ValidationError("出題順を確認してください");
+  const preferences = { daily_review_limit: parsePositiveLimit(body.dailyReviewLimit, "1日の復習上限"), daily_new_card_limit: parsePositiveLimit(body.dailyNewCardLimit, "1日の新規カード上限"), review_order: body.reviewOrder } as const;
+  await saveLearningPreferences(c.env.DB, user.id, preferences);
+  return c.json({ preferences });
+});
+
+app.get("/api/study/reminder", async (c) => {
+  const user = await requireUser(c);
+  await requirePremium(c, user.id);
+  return c.json({ reminder: await getReminderPreferences(c.env.DB, user.id) });
+});
+
+app.put("/api/study/reminder", async (c) => {
+  const user = await requireUser(c);
+  await requirePremium(c, user.id);
+  const body = await c.req.json<{ enabled?: unknown; reminderTime?: unknown }>();
+  if (typeof body.enabled !== "boolean") throw new ValidationError("リマインダーの設定を確認してください");
+  const reminder = { enabled: body.enabled ? 1 : 0, reminder_time: parseReminderTime(body.reminderTime) };
+  await saveReminderPreferences(c.env.DB, user.id, reminder);
+  return c.json({ reminder });
 });
 
 app.post("/api/books/:bookId/cards", async (c) => {
@@ -237,25 +332,46 @@ app.get("/api/books/:bookId", async (c) => {
 
 app.patch("/api/books/:bookId", async (c) => {
   const user = await requireUser(c);
-  const body = await c.req.json<{ title?: unknown }>();
-  const book = await updateBookTitle(c.env.DB, user.id, c.req.param("bookId"), parseTitle(body.title));
+  const body = await c.req.json<{ title?: unknown; folderName?: unknown }>();
+  if (body.title === undefined && body.folderName === undefined) throw new ValidationError("変更内容を入力してください");
+  const book = await updateBook(c.env.DB, user.id, c.req.param("bookId"), {
+    ...(body.title === undefined ? {} : { title: parseTitle(body.title) }),
+    ...(body.folderName === undefined ? {} : { folderName: parseFolderName(body.folderName) }),
+  });
   if (!book) return jsonError("NOT_FOUND", "単語帳が見つかりません", 404);
   return c.json({ book });
 });
 
 app.patch("/api/books/:bookId/cards/:cardId", async (c) => {
   const user = await requireUser(c);
-  const body = await c.req.json<{ term?: unknown; translation?: unknown; sentence?: unknown }>();
+  const body = await c.req.json<{ term?: unknown; translation?: unknown; sentence?: unknown; tags?: unknown }>();
   const term = parseCardTerm(body.term);
   const updated = await updateCard(c.env.DB, user.id, c.req.param("bookId"), c.req.param("cardId"), {
     term,
     normalizedTerm: normalizeTerm(term),
     translation: parseCardCopy(body.translation, "日本語訳"),
     sentence: parseCardCopy(body.sentence, "例文"),
+    ...(body.tags === undefined ? {} : { tags: parseTags(body.tags) }),
   });
   if (updated.duplicate) return jsonError("DUPLICATE_TERM", "同じ単語がこの単語帳に登録されています", 409);
   if (!updated.card) return jsonError("NOT_FOUND", "学習カードが見つかりません", 404);
   return c.json({ card: updated.card });
+});
+
+app.post("/api/books/:bookId/cards/tags", async (c) => {
+  const user = await requireUser(c);
+  const body = await c.req.json<{ cardIds?: unknown; tags?: unknown }>();
+  const changed = await addTagsToCards(c.env.DB, user.id, c.req.param("bookId"), parseIdList(body.cardIds, "カード"), parseTags(body.tags));
+  if (!changed) return jsonError("NOT_FOUND", "学習カードが見つかりません", 404);
+  return c.json({ changed });
+});
+
+app.delete("/api/books/:bookId/cards", async (c) => {
+  const user = await requireUser(c);
+  const body = await c.req.json<{ cardIds?: unknown }>();
+  const deleted = await deleteCards(c.env.DB, user.id, c.req.param("bookId"), parseIdList(body.cardIds, "カード"));
+  if (!deleted) return jsonError("NOT_FOUND", "学習カードが見つかりません", 404);
+  return c.json({ deleted });
 });
 
 app.delete("/api/books/:bookId/cards/:cardId", async (c) => {
@@ -277,8 +393,14 @@ app.get("/api/study/next", async (c) => {
   const bookId = c.req.query("bookId");
   if (!bookId) return jsonError("VALIDATION_ERROR", "bookIdが必要です", 400);
   const reveal = c.req.query("reveal") === "true";
-  const card = await findStudyCard(c.env.DB, user.id, bookId, reveal);
-  return c.json({ card });
+  const subscription = await findSubscription(c.env.DB, user.id);
+  if (!isPremiumStatus(subscription?.status)) return c.json({ card: await findStudyCard(c.env.DB, user.id, bookId, reveal) });
+  const preferences = await getLearningPreferences(c.env.DB, user.id);
+  const reviewCount = await countTodayReviews(c.env.DB, user.id);
+  if (reviewCount >= preferences.daily_review_limit) return c.json({ card: null, dailyLimitReached: true });
+  const newCount = await countTodayNewCards(c.env.DB, user.id);
+  const card = await findStudyCard(c.env.DB, user.id, bookId, reveal, { newFirst: preferences.review_order === "new_first", allowNew: newCount < preferences.daily_new_card_limit });
+  return c.json({ card, dailyLimitReached: false, newCardLimitReached: newCount >= preferences.daily_new_card_limit });
 });
 
 app.post("/api/study/reviews", async (c) => {
@@ -394,6 +516,12 @@ app.get("/api/account/export", async (c) => {
   return c.json(await exportUserData(c.env.DB, user.id), 200, {
     "Content-Disposition": `attachment; filename="tannot-data-${new Date().toISOString().slice(0, 10)}.json"`,
   });
+});
+
+app.get("/api/account/export.csv", async (c) => {
+  const user = await requireUser(c);
+  const csv = createCardsCsv(await exportUserCsvRows(c.env.DB, user.id));
+  return c.body(csv, 200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="tannot-cards-${new Date().toISOString().slice(0, 10)}.csv"` });
 });
 
 app.delete("/api/account", async (c) => {

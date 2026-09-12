@@ -12,6 +12,7 @@ type Book = {
   updated_at: string;
   card_count: number;
   due_count: number;
+  folder_name: string;
 };
 
 export default function BooksPage() {
@@ -22,6 +23,8 @@ export default function BooksPage() {
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [folder, setFolder] = useState("");
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     fetch("/api/books").then(async (response) => {
@@ -38,17 +41,40 @@ export default function BooksPage() {
   const filteredBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ja-JP");
     if (!normalizedQuery) return books;
-    return books.filter((book) => book.title.toLocaleLowerCase("ja-JP").includes(normalizedQuery));
-  }, [books, query]);
+    return books.filter((book) => (!folder || book.folder_name === folder) && (!normalizedQuery || book.title.toLocaleLowerCase("ja-JP").includes(normalizedQuery)));
+  }, [books, query, folder]);
+  const folders = useMemo(() => [...new Set(books.map((book) => book.folder_name).filter(Boolean))].sort(), [books]);
+
+  async function importCsv(file: File | undefined) {
+    if (!file) return;
+    setImporting(true); setError(null); setNotice(null);
+    try {
+      const csv = await file.text();
+      const response = await fetch("/api/books/import-csv", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv }) });
+      const data = await response.json() as { books?: Book[]; importedCards?: number; error?: { message?: string } };
+      if (!response.ok) throw new Error(data.error?.message ?? "CSVを読み込めませんでした");
+      setNotice(`${data.books?.length ?? 0}冊・${data.importedCards ?? 0}枚を読み込みました`); setRefreshKey((key) => key + 1);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "CSVを読み込めませんでした"); }
+    finally { setImporting(false); }
+  }
+
+  async function moveBook(bookId: string, direction: -1 | 1) {
+    const index = books.findIndex((book) => book.id === bookId); const target = index + direction;
+    if (index < 0 || target < 0 || target >= books.length) return;
+    const reordered = [...books]; [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setBooks(reordered);
+    const response = await fetch("/api/books/reorder", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookIds: reordered.map((book) => book.id) }) });
+    if (!response.ok) { setError("単語帳の並び順を保存できませんでした"); setRefreshKey((key) => key + 1); }
+  }
 
   return <div className="stack">
     <div className="page-heading">
       <div><p className="eyebrow">YOUR NOTEBOOKS</p><h1>単語帳</h1><p>単語帳を選んで学習したり、単語を追加したりできます。</p></div>
-      <button className="button" type="button" onClick={() => {
+      <div className="actions"><label className="button secondary file-button">{importing ? "読み込み中…" : "CSVを読み込む"}<input type="file" accept=".csv,text/csv" disabled={importing} onChange={(event) => void importCsv(event.target.files?.[0])} /></label><button className="button" type="button" onClick={() => {
         setShowCreateForm((open) => !open);
         setSelectedBookId(null);
         setNotice(null);
-      }}>{showCreateForm ? "閉じる" : "新しい単語帳を作成"}</button>
+      }}>{showCreateForm ? "閉じる" : "新しい単語帳を作成"}</button></div>
     </div>
     {showCreateForm && <BookForm onCreated={() => {
       setShowCreateForm(false);
@@ -72,16 +98,17 @@ export default function BooksPage() {
     <section className="stack" aria-labelledby="saved-books-title">
       <div className="section-toolbar">
         <div className="section-title"><h2 id="saved-books-title">保存済み</h2></div>
-        <label className="search-field"><span className="visually-hidden">単語帳を検索</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="単語帳名で検索" /></label>
+        <div className="toolbar-controls"><label className="search-field"><span className="visually-hidden">単語帳を検索</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="単語帳名で検索" /></label>{folders.length > 0 && <label><span className="visually-hidden">フォルダで絞り込む</span><select value={folder} onChange={(event) => setFolder(event.target.value)}><option value="">すべてのフォルダ</option>{folders.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>}</div>
       </div>
       <div className="book-grid">{filteredBooks.map((book) => <article className="book-card" key={book.id}>
         <h3>{book.title}</h3>
+        {book.folder_name && <p><span className="tag">{book.folder_name}</span></p>}
         <p className="book-stats"><strong>{Number(book.due_count)}枚</strong> 復習 · 全{Number(book.card_count)}枚</p>
         <p className="muted">更新日 {new Date(book.updated_at).toLocaleDateString("ja-JP")}</p>
         <div className="actions">
           <button className="button secondary" type="button" onClick={() => { setSelectedBookId(book.id); setShowCreateForm(false); setNotice(null); }}>単語を追加</button>
           <Link className="button secondary" href={`/books/${book.id}`}>詳細</Link>
-          <Link className="button" href={`/study/${book.id}`}>{Number(book.due_count) > 0 ? "復習する" : "学習"}</Link>
+          <Link className="button" href={`/study/${book.id}`}>{Number(book.due_count) > 0 ? "復習する" : "学習"}</Link><button className="text-button" type="button" onClick={() => void moveBook(book.id, -1)} disabled={books[0]?.id === book.id}>↑</button><button className="text-button" type="button" onClick={() => void moveBook(book.id, 1)} disabled={books.at(-1)?.id === book.id}>↓</button>
         </div>
       </article>)}</div>
       {books.length === 0 && !error && <p className="muted">まだ単語帳がありません。</p>}

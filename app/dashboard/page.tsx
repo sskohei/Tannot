@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DailyReminder } from "@/components/PremiumLearning";
 
 type SummaryBook = { id: string; title: string; card_count: number; due_count: number };
 type Summary = { totalDue: number; totalCards: number; books: SummaryBook[] };
@@ -22,6 +23,7 @@ export default function DashboardPage() {
   if (!summary) return <p className="muted" role="status">学習状況を読み込み中…</p>;
 
   return <div className="stack">
+    <DailyReminder totalDue={summary.totalDue} />
     <section className="dashboard-hero panel pop-shadow">
       <div><p className="eyebrow">TODAY</p><h1>今日の復習</h1><p className="muted">忘れかけたカードから、少しずつ進めましょう。</p></div>
       <div className="due-total" aria-label={`今日の復習は${summary.totalDue}枚`}><strong>{summary.totalDue}</strong><span>枚</span></div>

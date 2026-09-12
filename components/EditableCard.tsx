@@ -9,11 +9,14 @@ export type EditableCardData = {
   sentence: string | null;
   sentence_source_url: string | null;
   error_message: string | null;
+  tags?: string[];
 };
 
-export function EditableCard({ bookId, card, onUpdated, onDeleted }: {
+export function EditableCard({ bookId, card, selected, onSelected, onUpdated, onDeleted }: {
   bookId: string;
   card: EditableCardData;
+  selected: boolean;
+  onSelected: (checked: boolean) => void;
   onUpdated: (card: EditableCardData) => void;
   onDeleted: (cardId: string) => void;
 }) {
@@ -21,6 +24,7 @@ export function EditableCard({ bookId, card, onUpdated, onDeleted }: {
   const [term, setTerm] = useState(card.term);
   const [translation, setTranslation] = useState(card.translation ?? "");
   const [sentence, setSentence] = useState(card.sentence ?? "");
+  const [tags, setTags] = useState((card.tags ?? []).join(", "));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +32,7 @@ export function EditableCard({ bookId, card, onUpdated, onDeleted }: {
     setTerm(card.term);
     setTranslation(card.translation ?? "");
     setSentence(card.sentence ?? "");
+    setTags((card.tags ?? []).join(", "));
     setError(null);
     setEditing(false);
   }
@@ -40,7 +45,7 @@ export function EditableCard({ bookId, card, onUpdated, onDeleted }: {
       const response = await fetch(`/api/books/${bookId}/cards/${card.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ term, translation, sentence }),
+        body: JSON.stringify({ term, translation, sentence, tags }),
       });
       const data = await response.json() as { card?: EditableCardData; error?: { message?: string } };
       if (!response.ok || !data.card) throw new Error(data.error?.message ?? "カードを更新できませんでした");
@@ -75,6 +80,7 @@ export function EditableCard({ bookId, card, onUpdated, onDeleted }: {
       <label>英単語・熟語<input required maxLength={100} value={term} onChange={(event) => setTerm(event.target.value)} /></label>
       <label>日本語訳<textarea className="compact-textarea" maxLength={2000} value={translation} onChange={(event) => setTranslation(event.target.value)} /></label>
       <label>例文<textarea className="compact-textarea" maxLength={2000} value={sentence} onChange={(event) => setSentence(event.target.value)} /></label>
+      <label>タグ（カンマ区切り）<input maxLength={319} value={tags} onChange={(event) => setTags(event.target.value)} placeholder="例: 苦手, 動詞" /></label>
       <p className="form-note">編集すると、元の辞書・例文への出典情報はカードから外れます。</p>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions"><button className="button" disabled={loading}>{loading ? "保存中…" : "保存"}</button><button className="button secondary" type="button" onClick={reset} disabled={loading}>キャンセル</button></div>
@@ -82,7 +88,7 @@ export function EditableCard({ bookId, card, onUpdated, onDeleted }: {
   </article>;
 
   return <article className="panel editable-card">
-    <div className="card-copy"><h2>{card.term}</h2><p>{card.translation ?? "訳が設定されていません"}</p><p className="muted">{card.sentence ?? "例文が設定されていません"}</p></div>
+    <div className="card-copy"><label className="card-select"><input type="checkbox" checked={selected} onChange={(event) => onSelected(event.target.checked)} /><span className="visually-hidden">{card.term}を選択</span></label><h2>{card.term}</h2><p>{card.translation ?? "訳が設定されていません"}</p><p className="muted">{card.sentence ?? "例文が設定されていません"}</p>{card.tags?.length ? <p className="tag-list">{card.tags.map((tag) => <span className="tag" key={tag}>{tag}</span>)}</p> : null}</div>
     {card.sentence_source_url && <p className="form-note"><a href={card.sentence_source_url} target="_blank" rel="noopener noreferrer">例文の出典を見る</a></p>}
     {card.error_message && <p className="error">{card.error_message}</p>}
     {error && <p className="error" role="alert">{error}</p>}

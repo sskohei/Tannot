@@ -3,6 +3,9 @@ const MAX_TITLE_LENGTH = 100;
 const MAX_INPUT_LENGTH = 10_000;
 const MAX_TERMS = 100;
 const MAX_CARD_COPY_LENGTH = 2_000;
+const MAX_FOLDER_NAME_LENGTH = 40;
+const MAX_TAG_LENGTH = 30;
+const MAX_TAGS = 10;
 
 export class ValidationError extends Error {
   readonly code = "VALIDATION_ERROR";
@@ -77,4 +80,38 @@ export function parseRequestId(value: unknown): string {
     throw new ValidationError("requestIdを確認してください");
   }
   return value;
+}
+
+export function parseFolderName(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value !== "string") throw new ValidationError("フォルダ名を確認してください");
+  const normalized = value.trim();
+  if (normalized.length > MAX_FOLDER_NAME_LENGTH) {
+    throw new ValidationError(`フォルダ名は${MAX_FOLDER_NAME_LENGTH}文字以内で入力してください`);
+  }
+  return normalized;
+}
+
+export function parseTags(value: unknown): string[] {
+  if (value === null || value === undefined || value === "") return [];
+  const rawTags = Array.isArray(value) ? value : typeof value === "string" ? value.split(/[|,]/u) : null;
+  if (!rawTags) throw new ValidationError("タグを確認してください");
+  const tags = rawTags.map((tag) => {
+    if (typeof tag !== "string") throw new ValidationError("タグを確認してください");
+    const normalized = tag.trim();
+    if (!normalized || normalized.length > MAX_TAG_LENGTH) {
+      throw new ValidationError(`タグは1〜${MAX_TAG_LENGTH}文字で入力してください`);
+    }
+    return normalized;
+  });
+  const unique = [...new Map(tags.map((tag) => [tag.toLocaleLowerCase("ja-JP"), tag])).values()];
+  if (unique.length > MAX_TAGS) throw new ValidationError(`タグは${MAX_TAGS}個までです`);
+  return unique;
+}
+
+export function parseIdList(value: unknown, label: string): string[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 100 || value.some((id) => typeof id !== "string" || id.length === 0 || id.length > 100)) {
+    throw new ValidationError(`${label}を確認してください`);
+  }
+  return [...new Set(value)];
 }
