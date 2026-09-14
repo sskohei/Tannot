@@ -7,7 +7,7 @@
 - [ ] iPhone SafariでGoogleログイン、単語帳作成、カード編集・削除、音声、復習を確認する。
 - [ ] Android Chromeで同じ操作を確認する。
 - [ ] Apple Pay対応端末のSafariでStripe CheckoutにApple Payが表示される。
-- [ ] Google Pay対応端末のChromeでStripe CheckoutにGoogle Payが表示される。
+- [ ] 利用可能なカードをGoogleアカウントに登録し、保存済み支払い方法の確認を許可した対応端末のChromeで、Stripeのウォレット表示デモとTannotのCheckoutにGoogle Payが表示される。
 - [ ] 320px幅でヘッダー、フォーム、カード、料金・法務ページに横スクロールが発生しない。
 - [ ] キーボードだけでナビゲーション、フォーム、編集、削除確認、復習評価を操作できる。
 - [ ] 200%拡大でも情報や操作が欠けない。
@@ -16,7 +16,8 @@
 ## Stripeテストモード
 
 - [ ] Product / Priceがプレミアム月額500円（税込）として設定されている。
-- [ ] 動的決済手段でカード、Apple Pay、Google Payを有効にし、必要なドメインを登録する。
+- [ ] Checkoutが使用する決済手段設定でカード、Apple Pay、Google Payを有効にする。Google Payの実効設定が `on`・利用可能状態が `true` であることを確認する。
+- [ ] 本番公開時は本番の決済手段設定も別途確認する。現在のStripeホスト型Checkoutでは自サイトのドメイン登録は不要。埋め込みCheckoutやElementsへ変更する場合に表示元ドメインを登録する。
 - [ ] Customer Portalで支払い方法更新、請求書閲覧、期間末解約を有効にする。
 - [ ] Stripeの顧客メールで、支払い成功の領収書と支払い失敗通知を有効にする。
 - [ ] Checkout完了、トライアル開始・終了、更新成功、支払い失敗、追加認証、解約をテストする。
