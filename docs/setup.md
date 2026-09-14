@@ -54,6 +54,22 @@ Stripe側の契約が `active` / `trialing` で、ローカルの `subscriptions
 
 秘密情報はコミットしません。Cloudflare Workersへデプロイする場合は `npm run deploy` を使います。ステージングは `npm run deploy -- --env staging` を使います。
 
+### Apple Payは表示されるがGoogle Payが表示されない場合
+
+TannotはStripeがホストするCheckoutページへ遷移します。ウォレットの表示はStripe側の決済手段設定と利用者の端末・ブラウザで決まり、アプリのGoogleログインとは別です。StripeではApple Payが初期状態で有効でも、Google Payは無効の場合があります。
+
+1. Stripe Dashboardで、`.env.local` のキーと同じテスト環境を選びます。「設定 → 決済手段」でCheckoutが使用する設定のGoogle Payを明示的に有効にします。テスト環境での変更は本番の有効化を保証しないため、本番は公開前に別途確認します。
+2. APIで調べる場合、対象Checkoutの `payment_method_configuration_details.id` から使用中のPayment Method Configurationを取得します。`google_pay.display_preference.value` が `on`、`google_pay.available` が `true` であることを確認します。`payment_method_types` に `google_pay` がなくても異常ではありません。Google Payはカードのウォレットとして処理されます。
+3. Google Payに対応する端末・ブラウザで確認します。Googleアカウントに利用可能なカードを登録し、Chromeではサイトによる保存済み支払い方法の確認を許可します。Googleログイン済み、またはApple Walletにカード登録済みというだけでは、Google Payの準備完了を意味しません。
+4. 同じ端末・ブラウザで[Stripeのウォレット表示デモ](https://docs.stripe.com/testing/wallets)と比較します。デモにも出なければ端末側を、デモに出てTannotのCheckoutに出なければStripe設定・セッション条件を確認します。
+5. 今後 `automatic_tax` を有効にする際は、配送先住所を収集しないとGoogle Payが非表示になる条件にも注意してください。現状のTannotは自動税計算を有効にしていません。
+
+現在のStripeホスト型Checkoutでは、自サイトのPayment method domains登録やGoogle Pay用フロントエンドの追加は不要です。ローカルの戻り先URLがHTTPでも、決済ページ自体はStripeのHTTPS上にあります。将来、埋め込みCheckoutやElementsへ変更する場合は、表示元ドメインの登録とHTTPS要件を別途満たします。
+
+表示を再確認するために既存のプレミアム契約を解約したり、同じ利用者で再契約したりしないでください。実機で表示だけを確認する場合は別のテスト利用者を使い、不要な決済確定を避けます。APIで有効化を確認できても、実機でのウォレット表示・決済の確認とは区別します。
+
+参考: [Checkoutの決済手段設定](https://docs.stripe.com/payments/payment-method-configurations)、[ウォレットの表示条件](https://docs.stripe.com/testing/wallets)、[ドメイン登録が必要な組み込み方式](https://docs.stripe.com/payments/payment-methods/pmd-registration)。
+
 ## 本番環境
 
 - Cloudflare Workers の secret と環境変数を、本番・ステージングで分離する。
@@ -64,7 +80,7 @@ Stripe側の契約が `active` / `trialing` で、ローカルの `subscriptions
 - 本番リソースのdatabase_idとremote migration手順は [`docs/production.md`](./production.md) を確認する。
 - デプロイ後にログイン、単語帳作成、音声再生、レビュー保存、Checkout、webhook を確認する。
 - webhook は再送される前提で、処理成功後だけ `stripe_events` に記録され、処理失敗時の再送で回復できることを確認する。
-- Stripe Dashboardの動的決済手段でカード、Apple Pay、Google Payを有効化し、本番・ステージングそれぞれのHTTPSドメインをPayment method domainsとして登録する。Customer Portalでは、支払い方法の更新、請求書の閲覧、期間末での解約を有効化する。
+- Stripe Dashboardの動的決済手段でカード、Apple Pay、Google Payを環境ごとに有効化する。現在のStripeホスト型Checkoutでは自サイトのPayment method domains登録は不要。埋め込みCheckoutやElementsへ変更する場合は表示元ドメインを登録する。Customer Portalでは、支払い方法の更新、請求書の閲覧、期間末での解約を有効化する。
 
 ## 必須情報の例
 

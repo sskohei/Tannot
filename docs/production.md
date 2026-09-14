@@ -44,7 +44,7 @@ npm run build
 ## プレミアム公開前チェック
 
 - Stripeの本番Product / Priceを「プレミアム・月額500円（税込）」として作成し、`STRIPE_PRICE_ID`を設定する。
-- Stripe Checkoutの決済手段でカード、Apple Pay、Google Payを有効にする。Apple Pay・Google Payを表示する本番ドメインおよびステージングドメインは、Stripe DashboardのPayment method domainsへ登録する。
+- Stripe Checkoutが使用する本番の決済手段設定で、カード、Apple Pay、Google Payを有効にする。Google Payは初期状態で無効の場合があるため、テスト環境だけでなく本番の設定も確認する。現在のStripeホスト型Checkoutでは自サイトのPayment method domains登録は不要。将来、埋め込みCheckoutやElementsを使う場合は本番・ステージングの表示元ドメインを登録する。表示されない場合は[設定と端末条件の切り分け](./setup.md#apple-payは表示されるがgoogle-payが表示されない場合)を参照する。
 - Stripe Customer Portalで、支払い方法の更新、請求書の閲覧、期間末での解約を有効にし、返却先URLを本番ドメインへ設定する。
 - 次のイベントを本番webhook endpointへ送信する。
   - `checkout.session.completed`
