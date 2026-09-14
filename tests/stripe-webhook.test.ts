@@ -54,6 +54,38 @@ function createWebhookDb() {
 }
 
 describe("Stripe webhook processing", () => {
+  it.each([
+    { paymentStatus: "paid", subscriptionStatus: "active" },
+    { paymentStatus: "paid", subscriptionStatus: "trialing" },
+    { paymentStatus: "no_payment_required", subscriptionStatus: "trialing" },
+  ] as const)("syncs completed Checkout ($paymentStatus) to $subscriptionStatus and handles redelivery", async ({ paymentStatus, subscriptionStatus }) => {
+    const state = createWebhookDb();
+    const requested: string[] = [];
+    const reader: StripeSubscriptionReader = {
+      async retrieve(id) {
+        requested.push(id);
+        return subscription({ status: subscriptionStatus });
+      },
+    };
+    const input = event("checkout.session.completed", {
+      id: "cs_completed",
+      payment_status: paymentStatus,
+      subscription: "sub_123",
+    });
+
+    await expect(processStripeWebhookEvent(state.db, reader, input)).resolves.toEqual({ duplicate: false });
+    expect(requested).toEqual(["sub_123"]);
+    expect(state.subscriptions).toHaveLength(1);
+    expect(state.subscriptions[0].slice(0, 4)).toEqual(["user-1", "cus_123", "sub_123", subscriptionStatus]);
+    expect(state.processed.has(input.id)).toBe(true);
+    expect(state.deletedCheckoutSessions).toEqual(["cs_completed"]);
+
+    await expect(processStripeWebhookEvent(state.db, reader, input)).resolves.toEqual({ duplicate: true });
+    expect(requested).toHaveLength(1);
+    expect(state.subscriptions).toHaveLength(1);
+    expect(state.deletedCheckoutSessions).toHaveLength(1);
+  });
+
   it("records an event only after successful processing so a failed event can be retried", async () => {
     const state = createWebhookDb();
     let attempts = 0;

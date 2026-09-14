@@ -9,13 +9,48 @@
 5. `npx wrangler d1 execute tannot --local --file=db/seed.sql` で開発用データを投入する。
 6. `npm run dev` でNext.jsを起動する。Cloudflare Worker相当の環境で確認する場合は `npm run preview` を使う。
 
-Stripe webhookをローカルで確認する場合は別ターミナルでStripe CLIを起動し、表示されたローカル用の`whsec_...`を`.env.local`の`STRIPE_WEBHOOK_SECRET`へ設定します。
+### ローカルのStripe決済テスト
+
+**Checkoutの完了だけではローカルのプランは更新されません。** 契約状態は `/api/billing/webhook` が受信したイベントからD1へ保存します。Stripeからlocalhostへ直接配信はできないため、決済前から別ターミナルでStripe CLIの転送を起動し、テスト中は動かし続けてください。
+
+1. `.env.local` のStripeキーと価格が同じテスト環境のものになっていることを確認します。Stripe CLIも `stripe login` で同じアカウント・テスト環境を使用します。
+2. 次のコマンドで転送を開始します。開発サーバーが3000以外のポートを使用している場合は、転送先も合わせます。
 
 ```bash
 stripe listen \
   --events checkout.session.completed,checkout.session.expired,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,customer.subscription.paused,customer.subscription.resumed,customer.subscription.trial_will_end,invoice.paid,invoice.payment_failed,invoice.payment_action_required,invoice.finalization_failed \
   --forward-to http://localhost:3000/api/billing/webhook
 ```
+
+3. `stripe listen` に表示されたローカル用の署名シークレットを `.env.local` の `STRIPE_WEBHOOK_SECRET` へ設定し、Next.jsを再起動します。DashboardのWebhookエンドポイント用シークレットとは異なります。値をログ・PR・チャットへ貼り付けないでください。
+4. アプリにログインし、設定画面からCheckoutへ進みます。`stripe trigger` の汎用データではアプリのユーザーに紐付く契約を検証できません。
+5. 転送ターミナルで `checkout.session.completed` または `customer.subscription.created` に対するHTTP 200を確認します。
+6. 設定画面を再読み込みし、「プレミアム（無料トライアル中）」または「プレミアム」になることを確認します。現在の設定画面は契約情報を初回表示時に取得するため、戻った直後にWebhook処理がまだ終わっていない場合は再読み込みが必要です。
+
+### Checkout完了後も無料プランのままの場合
+
+再度Checkoutを作成する前に、イベントの反映状況を確認してください。Stripe側にすでに契約がある状態で申込みを繰り返すと、重複契約につながります。
+
+| 確認結果 | 確認・対処すること |
+| --- | --- |
+| CLIにイベントが表示されない | 決済時に転送が動いていたか、Stripeキー・価格・CLIのテスト環境が一致しているかを確認する。決済後に `stripe listen` を起動しても過去のイベントは自動では転送されない。 |
+| 接続エラー・404 | 開発サーバーの実際のポートと `/api/billing/webhook` の転送先を確認する。Windows側でCLIを動かす場合は、その端末からWSLの開発サーバーへ到達できることも確認する。 |
+| 400 `INVALID_SIGNATURE` | `stripe listen` の署名シークレットが設定されているか確認し、変更後はNext.jsを再起動する。 |
+| 503 `BILLING_NOT_CONFIGURED` | ローカルの `STRIPE_SECRET_KEY` と `STRIPE_WEBHOOK_SECRET` が読み込まれているか確認する。 |
+| 500 | サーバーログの `stripe_webhook_failed`、D1のマイグレーション適用状況、Stripe APIへの接続・権限を確認する。失敗イベントは処理済みにならないため、原因解消後に再送できる。 |
+| 200でも表示が変わらない | 設定画面を再読み込みする。契約の `metadata.userId` がログイン中ユーザーと一致するか、アプリと確認先D1が同じ環境かを確認する。 |
+
+ローカルDBの件数と契約状態は、個人情報やキーを表示せずに確認できます。
+
+```bash
+npx wrangler d1 execute tannot --local --command="SELECT status, COUNT(*) AS count FROM subscriptions GROUP BY status; SELECT COUNT(*) AS processed_events FROM stripe_events;"
+```
+
+Stripe側の契約が `active` / `trialing` で、ローカルの `subscriptions` と `stripe_events` が両方空なら、Webhookが正常に処理されていない状態です。Checkoutの戻り先URLにある `billing=success` は決済の証明として使用しません。
+
+取り逃したイベントを復旧する場合は、実際にアプリから作成したテスト用Checkoutに対応するイベントを使用します。登録済みWebhook宛ての再送はStripeのWorkbenchまたは `stripe events resend` で行えますが、`stripe listen` のローカル転送先は登録済みエンドポイントとは別です。ローカルへ再現する際は、対象イベントがテストモード・対象ユーザーのものと確認したうえで、ローカル用署名を付けて再送します。DBを手動で `active` に書き換えたり、署名検証を無効化したりしないでください。
+
+参考: [ローカルWebhook転送](https://docs.stripe.com/webhooks#test-locally-without-a-registered-url)、[署名検証のトラブルシューティング](https://docs.stripe.com/webhooks/signature)。
 
 秘密情報はコミットしません。Cloudflare Workersへデプロイする場合は `npm run deploy` を使います。ステージングは `npm run deploy -- --env staging` を使います。
 
